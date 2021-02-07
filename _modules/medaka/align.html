@@ -1,0 +1,529 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.align &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.align</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.align</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Alignment and CIGAR string processing.&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">edlib</span>
+<span class="kn">import</span> <span class="nn">parasail</span>
+<span class="kn">import</span> <span class="nn">pysam</span>
+
+<span class="n">re_split_cigar</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?P&lt;len&gt;\d+)(?P&lt;op&gt;\D+)&quot;</span><span class="p">)</span>
+<span class="n">re_split_cigar_rev</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?P&lt;op&gt;\D+)(?P&lt;len&gt;\d+)&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="cigar_ops_from_start"><a class="viewcode-back" href="../../medaka.html#medaka.align.cigar_ops_from_start">[docs]</a><span class="k">def</span> <span class="nf">cigar_ops_from_start</span><span class="p">(</span><span class="n">cigar</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Yield cigar string operations from start of cigar (in order).</span>
+
+<span class="sd">    :param cigar: cigar string.</span>
+
+<span class="sd">    :yields: str, op. length, str op. type</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">re_split_cigar</span><span class="p">,</span> <span class="n">cigar</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;len&#39;</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;op&#39;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="cigar_ops_from_end"><a class="viewcode-back" href="../../medaka.html#medaka.align.cigar_ops_from_end">[docs]</a><span class="k">def</span> <span class="nf">cigar_ops_from_end</span><span class="p">(</span><span class="n">cigar</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Yield cigar string operations from end of cigar (in reverse order).</span>
+
+<span class="sd">    :param cigar: cigar string.</span>
+
+<span class="sd">    :yields: str, op. length, str op. type</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">re_split_cigar_rev</span><span class="p">,</span> <span class="n">cigar</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="k">yield</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;len&#39;</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s1">&#39;op&#39;</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="trim_cigar"><a class="viewcode-back" href="../../medaka.html#medaka.align.trim_cigar">[docs]</a><span class="k">def</span> <span class="nf">trim_cigar</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Trim cigar string to start or end on a match.</span>
+
+<span class="sd">    :param cigar: cigar string.</span>
+<span class="sd">    :param start: if True, trim start, else trim end.</span>
+
+<span class="sd">    :returns: cigar, number bases to trim from query, rstart offset</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">trim_cigar</span><span class="p">,</span> <span class="n">rstart_offset</span><span class="p">,</span> <span class="n">q_trim</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="n">op_gen</span> <span class="o">=</span> <span class="n">cigar_ops_from_start</span> <span class="k">if</span> <span class="n">start</span> <span class="k">else</span> <span class="n">cigar_ops_from_end</span>
+    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">op_gen</span><span class="p">(</span><span class="n">cigar</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s1">&#39;=&#39;</span><span class="p">:</span>
+            <span class="k">break</span>
+        <span class="n">trim_cigar</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;I&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">}:</span>
+            <span class="c1"># insertion or mismatch at start/end of aln, trim cigar and query</span>
+            <span class="n">q_trim</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+            <span class="c1"># only offset rstart for deletion at start</span>
+            <span class="n">rstart_offset</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="n">op</span> <span class="o">==</span> <span class="s1">&#39;X&#39;</span> <span class="ow">and</span> <span class="n">start</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">elif</span> <span class="n">op</span> <span class="o">==</span> <span class="s1">&#39;D&#39;</span><span class="p">:</span>  <span class="c1"># query does not need trimming</span>
+            <span class="c1"># deletion of ref base at start/end of alignment (global alignment)</span>
+            <span class="n">rstart_offset</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">start</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Encountered unsupported cigar operation: </span><span class="si">{}</span><span class="s1">&#39;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+    <span class="n">cigar</span> <span class="o">=</span> <span class="n">cigar</span><span class="p">[</span><span class="n">trim_cigar</span><span class="p">:]</span> <span class="k">if</span> <span class="n">start</span> <span class="k">else</span> <span class="n">cigar</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">cigar</span><span class="p">)</span> <span class="o">-</span> <span class="n">trim_cigar</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">cigar</span><span class="p">,</span> <span class="n">q_trim</span><span class="p">,</span> <span class="n">rstart_offset</span></div>
+
+
+<div class="viewcode-block" id="parasail_to_sam"><a class="viewcode-back" href="../../medaka.html#medaka.align.parasail_to_sam">[docs]</a><span class="k">def</span> <span class="nf">parasail_to_sam</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">seq</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Extract reference start and sam compatible cigar string.</span>
+
+<span class="sd">    :param result: parasail alignment result.</span>
+<span class="sd">    :param seq: query sequence.</span>
+
+<span class="sd">    :returns: reference start coordinate, cigar string.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cigstr</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">decode</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+
+    <span class="n">first</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">cigar_ops_from_start</span><span class="p">(</span><span class="n">cigstr</span><span class="p">))</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">first</span><span class="p">)</span>
+    <span class="n">rstart</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_ref</span>
+    <span class="n">cliplen</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_query</span>
+    <span class="n">clip</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">cliplen</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cliplen</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">first</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;I&#39;</span><span class="p">:</span>
+        <span class="n">pre</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">first</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="n">cliplen</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">first</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;D&#39;</span><span class="p">:</span>
+        <span class="n">pre</span> <span class="o">=</span> <span class="n">clip</span>
+        <span class="n">rstart</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">first</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">pre</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">clip</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span>
+
+    <span class="n">mid</span> <span class="o">=</span> <span class="n">cigstr</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">prefix</span><span class="p">):]</span>
+    <span class="n">end_clip</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span> <span class="o">-</span> <span class="n">result</span><span class="o">.</span><span class="n">end_query</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">suf</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">end_clip</span><span class="p">)</span> <span class="k">if</span> <span class="n">end_clip</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">new_cigstr</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">pre</span><span class="p">,</span> <span class="n">mid</span><span class="p">,</span> <span class="n">suf</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">rstart</span><span class="p">,</span> <span class="n">new_cigstr</span></div>
+
+
+<div class="viewcode-block" id="parasail_alignment"><a class="viewcode-back" href="../../medaka.html#medaka.align.parasail_alignment">[docs]</a><span class="k">def</span> <span class="nf">parasail_alignment</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">ref</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Run a Smith-Waterman alignment between two sequences.</span>
+
+<span class="sd">    :param query: the query sequence.</span>
+<span class="sd">    :param ref: the reference sequence.</span>
+
+<span class="sd">    :returns: reference start co-ordinate, cigar string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">parasail</span><span class="o">.</span><span class="n">sw_trace_striped_32</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">parasail</span><span class="o">.</span><span class="n">dnafull</span><span class="p">)</span>
+    <span class="n">rstart</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">parasail_to_sam</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rstart</span><span class="p">,</span> <span class="n">cigar</span></div>
+
+
+<div class="viewcode-block" id="add_extra_clipping"><a class="viewcode-back" href="../../medaka.html#medaka.align.add_extra_clipping">[docs]</a><span class="k">def</span> <span class="nf">add_extra_clipping</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span> <span class="n">start_clipped</span><span class="p">,</span> <span class="n">end_clipped</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Add extra soft clipping to begining and end of cigar string.</span>
+
+<span class="sd">    :param cigar: input cigar string</span>
+<span class="sd">    :param start_clipped: soft clipping to be added at the start of the read</span>
+<span class="sd">    :param end_clipped: soft clipping to be added at the end of the read</span>
+
+<span class="sd">    :returns: modified cigar string</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Add start and end clipping</span>
+    <span class="k">if</span> <span class="n">start_clipped</span><span class="p">:</span>
+        <span class="n">oplen</span><span class="p">,</span> <span class="n">op</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">cigar_ops_from_start</span><span class="p">(</span><span class="n">cigar</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s1">&#39;S&#39;</span><span class="p">:</span>
+            <span class="n">orig_clip</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">oplen</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+            <span class="n">corrected_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">oplen</span><span class="p">)</span> <span class="o">+</span> <span class="n">start_clipped</span>
+            <span class="n">head</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">corrected_length</span><span class="p">)</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">cigar</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">orig_clip</span><span class="p">):]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">head</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">start_clipped</span><span class="p">)</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">cigar</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">head</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">cigar</span>
+
+    <span class="k">if</span> <span class="n">end_clipped</span><span class="p">:</span>
+        <span class="n">oplen</span><span class="p">,</span> <span class="n">op</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">cigar_ops_from_end</span><span class="p">(</span><span class="n">cigar</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="s1">&#39;S&#39;</span><span class="p">:</span>
+            <span class="n">orig_clip</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">oplen</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+            <span class="n">corrected_length</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">oplen</span><span class="p">)</span> <span class="o">+</span> <span class="n">end_clipped</span>
+            <span class="n">tail</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">corrected_length</span><span class="p">)</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">body</span><span class="p">[:</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">orig_clip</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tail</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">end_clipped</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;S&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">tail</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">return</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">head</span><span class="p">,</span> <span class="n">body</span><span class="p">,</span> <span class="n">tail</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="initialise_alignment"><a class="viewcode-back" href="../../medaka.html#medaka.align.initialise_alignment">[docs]</a><span class="k">def</span> <span class="nf">initialise_alignment</span><span class="p">(</span>
+        <span class="n">query_name</span><span class="p">,</span> <span class="n">reference_id</span><span class="p">,</span> <span class="n">reference_start</span><span class="p">,</span>
+        <span class="n">query_sequence</span><span class="p">,</span> <span class="n">cigarstring</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">mapping_quality</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+        <span class="n">query_qualities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create a `pysam.AlignedSegment` object.</span>
+
+<span class="sd">    :param query_name: name of the query sequence</span>
+<span class="sd">    :param reference_id: index to the reference name</span>
+<span class="sd">    :param reference_start: 0-based index of first leftmost reference</span>
+<span class="sd">        coordinate</span>
+<span class="sd">    :param query_sequence: read sequence bases, including those soft clipped</span>
+<span class="sd">    :param cigarstring: cigar string representing the alignment of query</span>
+<span class="sd">        and reference</span>
+<span class="sd">    :param flag: bitwise flag representing some properties of the alignment</span>
+<span class="sd">        (see SAM format)</span>
+<span class="sd">    :param mapping_quality: optional quality of the mapping or query to</span>
+<span class="sd">        reference</span>
+<span class="sd">    :param query_qualities: optional base qualities of the query, including</span>
+<span class="sd">        soft-clipped ones!</span>
+<span class="sd">    :param header: optional `pysam.AlignmentHeader` object, enabling use of the</span>
+<span class="sd">        reference_name attr of the returned `pysam.AlignedSegment` obj.</span>
+
+<span class="sd">    :returns: `pysam.AlignedSegment` object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">header</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignedSegment</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignedSegment</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">query_name</span> <span class="o">=</span> <span class="n">query_name</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">reference_id</span> <span class="o">=</span> <span class="n">reference_id</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">reference_start</span> <span class="o">=</span> <span class="n">reference_start</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">query_sequence</span> <span class="o">=</span> <span class="n">query_sequence</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">cigarstring</span> <span class="o">=</span> <span class="n">cigarstring</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">flag</span> <span class="o">=</span> <span class="n">flag</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">mapping_quality</span> <span class="o">=</span> <span class="n">mapping_quality</span>
+    <span class="k">if</span> <span class="n">query_qualities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">query_qualities</span> <span class="o">=</span> <span class="n">query_qualities</span>
+
+    <span class="k">for</span> <span class="n">tag_name</span><span class="p">,</span> <span class="n">tag_value</span> <span class="ow">in</span> <span class="n">tags</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="n">tag_name</span><span class="p">,</span> <span class="n">tag_value</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">a</span></div>
+
+
+<div class="viewcode-block" id="chunked_edlib_align"><a class="viewcode-back" href="../../medaka.html#medaka.align.chunked_edlib_align">[docs]</a><span class="k">def</span> <span class="nf">chunked_edlib_align</span><span class="p">(</span><span class="n">qseq</span><span class="p">,</span> <span class="n">rseq</span><span class="p">,</span> <span class="n">contig_name</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span>
+                        <span class="n">pad</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;NW&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Align query to reference in chunks using edlib.</span>
+
+<span class="sd">    .. note::</span>
+
+<span class="sd">        * Chunks are aligned sequentially and consecutive alignments overlap by</span>
+<span class="sd">          1 match (= cigar op) to facilitate decoding of variants.</span>
+<span class="sd">        * First chunk uses infix (HW) option to allow start of the first.</span>
+<span class="sd">          query chunk to be offset from the start of the first ref chunk.</span>
+<span class="sd">        * Subsequent chunks use the prefix(SHW) for alignment extension.</span>
+<span class="sd">        * In both cases edlib forces all query bases to align.</span>
+<span class="sd">        * This method assumes query can be aligned to ref in a single</span>
+<span class="sd">          alignment, and thus the absense of any large structural variants.</span>
+<span class="sd">        * Chunking can affect anchoring context around long indels.</span>
+<span class="sd">        * Increase chunk_size to avoid spurious alignment of long insertions.</span>
+<span class="sd">        * Increase pad to avoid spurious alignment of long deletions.</span>
+<span class="sd">        * It is assumed that query contigs have the same names as ref contigs.</span>
+
+<span class="sd">    :param qseq: str, query sequence.</span>
+<span class="sd">    :param rseq: str, reference sequence.</span>
+<span class="sd">    :param chunk_size: int, length of consensus chunks. Runtime scales</span>
+<span class="sd">        quadratically with chunksize.</span>
+<span class="sd">    :param pad: int, reference chunks are `chunk_size` + `pad` bases long.</span>
+<span class="sd">    :param mode: str, alignment mode</span>
+<span class="sd">        HW - chunked version of edlib HW mode (global in query, local in ref).</span>
+<span class="sd">        NW - chunked version of edlib NW mode (global in query and ref).</span>
+<span class="sd">        HWT - same as HW, but first/last alignment starts/ends on a match.</span>
+<span class="sd">    :param header: `pysam.AlignmentHeader` obj, if not given the reference_name</span>
+<span class="sd">        attr of yielded `pysam.AlignedSegment` obj will not be available.</span>
+
+<span class="sd">    :yields: `pysam.AlignedSegment` objs</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># TODO this could break down if we have variants longer than the chunksize</span>
+    <span class="c1"># such that a chunk could not contain two matches that we trim back to as</span>
+    <span class="c1"># start and end. We could implement something to detect such cases and</span>
+    <span class="c1"># increase the chunk size until we span the variant - however, is this</span>
+    <span class="c1"># really needed for a small-variant caller?</span>
+
+    <span class="n">ends_modes</span> <span class="o">=</span> <span class="p">{</span>  <span class="c1"># edlib modes for first and last chunks</span>
+        <span class="s1">&#39;HW&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;HW&#39;</span><span class="p">,</span> <span class="s1">&#39;SHW&#39;</span><span class="p">),</span>
+        <span class="s1">&#39;NW&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;SHW&#39;</span><span class="p">,</span> <span class="s1">&#39;NW&#39;</span><span class="p">),</span>
+        <span class="s1">&#39;HWT&#39;</span><span class="p">:</span> <span class="p">(</span><span class="s1">&#39;HW&#39;</span><span class="p">,</span> <span class="s1">&#39;SHW&#39;</span><span class="p">)</span>  <span class="c1"># same as &#39;HW&#39;, but we trim query.</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ends_modes</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Unrecognised mode option </span><span class="si">{}</span><span class="s1">, use one of </span><span class="si">{}</span><span class="s1">&#39;</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="nb">set</span><span class="p">(</span><span class="n">ends_modes</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+    <span class="n">mode_first</span><span class="p">,</span> <span class="n">mode_last</span> <span class="o">=</span> <span class="n">ends_modes</span><span class="p">[</span><span class="n">mode</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">check_cigar_starts_with_match</span><span class="p">(</span><span class="n">cigar</span><span class="p">):</span>
+        <span class="n">l</span><span class="p">,</span> <span class="n">op</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">cigar_ops_from_start</span><span class="p">(</span><span class="n">cigar</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="o">!=</span> <span class="s1">&#39;=&#39;</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Alignment did not start with a match: </span><span class="si">{}{}</span><span class="s1">&#39;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">op</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">header</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ref_id</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">references</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">contig_name</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ref_id</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># not rev_comp</span>
+
+    <span class="n">qend_last</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">qend</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">aln_last</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">trim_qend</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">while</span> <span class="n">qend</span> <span class="o">+</span> <span class="n">trim_qend</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">qseq</span><span class="p">):</span>
+        <span class="n">qstart</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">qend_last</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># overlap by 1 match</span>
+        <span class="n">qend</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">qend_last</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">qseq</span><span class="p">))</span>
+        <span class="n">is_last_chunk</span> <span class="o">=</span> <span class="n">qend</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">qseq</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qstart</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">rstart</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">rend</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rseq</span><span class="p">),</span> <span class="n">qend</span> <span class="o">+</span> <span class="n">pad</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_last_chunk</span> <span class="ow">and</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;NW&#39;</span><span class="p">:</span>
+                <span class="c1"># unchunked global alignment</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">edlib</span><span class="o">.</span><span class="n">align</span><span class="p">(</span><span class="n">qseq</span><span class="p">,</span> <span class="n">rseq</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s1">&#39;path&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;NW&#39;</span><span class="p">)</span>
+                <span class="n">rstart_aln</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;locations&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cigar&#39;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">edlib</span><span class="o">.</span><span class="n">align</span><span class="p">(</span><span class="n">qseq</span><span class="p">[</span><span class="n">qstart</span><span class="p">:</span><span class="n">qend</span><span class="p">],</span> <span class="n">rseq</span><span class="p">[</span><span class="n">rstart</span><span class="p">:</span><span class="n">rend</span><span class="p">],</span>
+                                     <span class="n">task</span><span class="o">=</span><span class="s1">&#39;path&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode_first</span><span class="p">)</span>
+                <span class="n">rstart_aln</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;locations&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cigar&#39;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;HWT&#39;</span><span class="p">:</span>  <span class="c1"># trim start of alignment</span>
+                    <span class="n">cigar</span><span class="p">,</span> <span class="n">trim_qstart</span><span class="p">,</span> <span class="n">r_offset</span> <span class="o">=</span> <span class="n">trim_cigar</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span>
+                                                              <span class="n">start</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="n">qstart</span> <span class="o">+=</span> <span class="n">trim_qstart</span>
+                    <span class="n">rstart_aln</span> <span class="o">+=</span> <span class="n">r_offset</span>
+                <span class="c1"># don&#39;t trim end if this is the last chunk unless mode is match</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">is_last_chunk</span> <span class="ow">or</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;HWT&#39;</span><span class="p">:</span>
+                    <span class="n">cigar</span><span class="p">,</span> <span class="n">trim_qend</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">trim_cigar</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="n">qend</span> <span class="o">-=</span> <span class="n">trim_qend</span>
+        <span class="k">elif</span> <span class="n">is_last_chunk</span><span class="p">:</span>
+            <span class="n">rstart</span> <span class="o">=</span> <span class="n">aln_last</span><span class="o">.</span><span class="n">reference_end</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># overlap by 1 match</span>
+            <span class="n">rend</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rseq</span><span class="p">)</span>
+            <span class="c1"># For last alignment, allow gaps only at end of qseq</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">edlib</span><span class="o">.</span><span class="n">align</span><span class="p">(</span><span class="n">qseq</span><span class="p">[</span><span class="n">qstart</span><span class="p">:</span><span class="n">qend</span><span class="p">],</span> <span class="n">rseq</span><span class="p">[</span><span class="n">rstart</span><span class="p">:</span><span class="n">rend</span><span class="p">],</span>
+                                 <span class="n">task</span><span class="o">=</span><span class="s1">&#39;path&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode_last</span><span class="p">)</span>
+            <span class="n">rstart_aln</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;locations&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cigar&#39;</span><span class="p">]</span>
+            <span class="n">check_cigar_starts_with_match</span><span class="p">(</span><span class="n">cigar</span><span class="p">)</span>
+            <span class="c1"># don&#39;t trim end of alignment for last chunk unless mode is match</span>
+            <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;HWT&#39;</span><span class="p">:</span>
+                <span class="n">cigar</span><span class="p">,</span> <span class="n">trim_qend</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">trim_cigar</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">qend</span> <span class="o">-=</span> <span class="n">trim_qend</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rstart</span> <span class="o">=</span> <span class="n">aln_last</span><span class="o">.</span><span class="n">reference_end</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># overlap by 1 match</span>
+            <span class="n">rend</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rseq</span><span class="p">),</span> <span class="n">rstart</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">)</span>
+            <span class="c1"># For subsequent alignments, allow gaps only at end of qseq</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">edlib</span><span class="o">.</span><span class="n">align</span><span class="p">(</span><span class="n">qseq</span><span class="p">[</span><span class="n">qstart</span><span class="p">:</span><span class="n">qend</span><span class="p">],</span> <span class="n">rseq</span><span class="p">[</span><span class="n">rstart</span><span class="p">:</span><span class="n">rend</span><span class="p">],</span>
+                                 <span class="n">task</span><span class="o">=</span><span class="s1">&#39;path&#39;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;SHW&#39;</span><span class="p">)</span>
+            <span class="n">rstart_aln</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;locations&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;cigar&#39;</span><span class="p">]</span>
+            <span class="n">check_cigar_starts_with_match</span><span class="p">(</span><span class="n">cigar</span><span class="p">)</span>
+
+            <span class="n">cigar</span><span class="p">,</span> <span class="n">trim_qend</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">trim_cigar</span><span class="p">(</span><span class="n">cigar</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">qend</span> <span class="o">-=</span> <span class="n">trim_qend</span>
+
+        <span class="n">qname</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_</span><span class="si">{}</span><span class="s1">_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">contig_name</span><span class="p">,</span> <span class="n">qstart</span><span class="p">,</span> <span class="n">qend</span><span class="p">)</span>
+        <span class="c1"># use edit distance to set NM tag, since alignments with no edits</span>
+        <span class="c1"># are skipped when decoding variants. Note that the edit distnce of</span>
+        <span class="c1"># the trimmed alignment could be less than this value.</span>
+        <span class="n">nm</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;editDistance&#39;</span><span class="p">]</span>
+        <span class="n">aln</span> <span class="o">=</span> <span class="n">initialise_alignment</span><span class="p">(</span><span class="n">qname</span><span class="p">,</span> <span class="n">ref_id</span><span class="p">,</span> <span class="n">rstart</span> <span class="o">+</span> <span class="n">rstart_aln</span><span class="p">,</span>
+                                   <span class="n">qseq</span><span class="p">[</span><span class="n">qstart</span><span class="p">:</span> <span class="n">qend</span><span class="p">],</span> <span class="n">cigar</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span>
+                                   <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">NM</span><span class="o">=</span><span class="n">nm</span><span class="p">))</span>
+
+        <span class="k">yield</span> <span class="n">aln</span>
+
+        <span class="n">qend_last</span><span class="p">,</span> <span class="n">aln_last</span> <span class="o">=</span> <span class="n">qend</span><span class="p">,</span> <span class="n">aln</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

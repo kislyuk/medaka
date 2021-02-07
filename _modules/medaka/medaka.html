@@ -1,0 +1,927 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.medaka &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.medaka</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.medaka</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="kn">import</span> <span class="nn">pysam</span>
+
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+<span class="kn">import</span> <span class="nn">medaka.datastore</span>
+<span class="kn">import</span> <span class="nn">medaka.features</span>
+<span class="kn">import</span> <span class="nn">medaka.labels</span>
+<span class="kn">import</span> <span class="nn">medaka.models</span>
+<span class="kn">import</span> <span class="nn">medaka.options</span>
+<span class="kn">import</span> <span class="nn">medaka.prediction</span>
+<span class="kn">import</span> <span class="nn">medaka.rle</span>
+<span class="kn">import</span> <span class="nn">medaka.smolecule</span>
+<span class="kn">import</span> <span class="nn">medaka.stitch</span>
+<span class="kn">import</span> <span class="nn">medaka.training</span>
+<span class="kn">import</span> <span class="nn">medaka.variant</span>
+<span class="kn">import</span> <span class="nn">medaka.vcf</span>
+<span class="kn">import</span> <span class="nn">medaka.wrappers</span>
+
+
+<div class="viewcode-block" id="ResolveModel"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.ResolveModel">[docs]</a><span class="k">class</span> <span class="nc">ResolveModel</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Resolve model filename or ID into filename&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Model file.&#39;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">option_strings</span><span class="p">,</span> <span class="n">dest</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="n">required</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> {{</span><span class="si">{}</span><span class="s1">}}&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">help</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">allowed_models</span><span class="p">)))</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">model_fp</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resolve_model</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Error validating model from &#39;--</span><span class="si">{}</span><span class="s2">&#39; argument: </span><span class="si">{}</span><span class="s2">.&quot;</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+        <span class="c1">#TODO: verify the file is a model?</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">model_fp</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CheckBlockSize"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.CheckBlockSize">[docs]</a><span class="k">class</span> <span class="nc">CheckBlockSize</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Check that block_size &lt; 94&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">values</span> <span class="o">&gt;</span> <span class="mi">94</span><span class="p">:</span>
+            <span class="n">parser</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s1">&#39;Maximum block_size is 94, to avoid going over the ASCII &#39;</span>
+                <span class="s1">&#39;limit of 127 (scores start in ASCII character 33).&#39;</span><span class="p">)</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CheckBam"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.CheckBam">[docs]</a><span class="k">class</span> <span class="nc">CheckBam</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Check a bam is a bam.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Filepath for &#39;--</span><span class="si">{}</span><span class="s2">&#39; argument does not exist (</span><span class="si">{}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="k">as</span> <span class="n">bam</span><span class="p">:</span>
+                <span class="c1"># just to check its a bam</span>
+                <span class="n">_</span> <span class="o">=</span> <span class="n">bam</span><span class="o">.</span><span class="n">references</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s1">&#39;The bam </span><span class="si">{}</span><span class="s1"> could not be read.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CheckBam.check_read_groups"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.CheckBam.check_read_groups">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">check_read_groups</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">rg</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check bam read groups are consistent with the specified read group.</span>
+
+<span class="sd">        Raises a RuntimeError if:</span>
+<span class="sd">            * no read group was specified but the bam has read groups</span>
+<span class="sd">            * user specified a read group but the bam has no read groups</span>
+<span class="sd">            * user specified a read group but it it not amongst bam read groups</span>
+
+<span class="sd">        :param fname: bam file name.</span>
+<span class="sd">        :param rg: check if this read group is present.</span>
+
+<span class="sd">        :raises: RuntimeError</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span> <span class="k">as</span> <span class="n">bam</span><span class="p">:</span>
+            <span class="c1"># As of 13/12/19 pypi still has no wheel for pysam v0.15.3 so we</span>
+            <span class="c1"># pinned to v0.15.2. However bioconda&#39;s v0.15.2 package</span>
+            <span class="c1"># conflicts with the libdeflate they have so we are forced</span>
+            <span class="c1"># to use newer versions. Newer versions however have a</span>
+            <span class="c1"># different API, sigh...</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">header_dict</span> <span class="o">=</span> <span class="n">bam</span><span class="o">.</span><span class="n">header</span><span class="o">.</span><span class="n">as_dict</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="n">header_dict</span> <span class="o">=</span> <span class="n">bam</span><span class="o">.</span><span class="n">header</span>
+
+            <span class="k">if</span> <span class="s1">&#39;RG&#39;</span> <span class="ow">in</span> <span class="n">header_dict</span><span class="p">:</span>
+                <span class="n">read_groups</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;ID&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">header_dict</span><span class="p">[</span><span class="s1">&#39;RG&#39;</span><span class="p">]])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">read_groups</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">rg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">read_groups</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># User asked for a read group but none were found</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;No RG tags found in the bam </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">rg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">read_groups</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># User did not ask for a read group but groups are present.</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s1">&#39;The bam </span><span class="si">{}</span><span class="s1"> contains more than one read group. &#39;</span>
+                    <span class="s1">&#39;Please specify `--RG` to select which read group&#39;</span>
+                    <span class="s1">&#39;to process from </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">read_groups</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">rg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">read_groups</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="c1"># User asked for a read group and groups are present.</span>
+                <span class="k">if</span> <span class="n">rg</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">read_groups</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;RG </span><span class="si">{}</span><span class="s1"> is not in the bam </span><span class="si">{}</span><span class="s1">. Try one of </span><span class="si">{}</span><span class="s1">&#39;</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rg</span><span class="p">,</span> <span class="n">fname</span><span class="p">,</span> <span class="n">read_groups</span><span class="p">))</span></div></div>
+
+
+<div class="viewcode-block" id="RegionParser"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.RegionParser">[docs]</a><span class="k">class</span> <span class="nc">RegionParser</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse regions, checking if --regions option is a bed file.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="c1"># parse bed file</span>
+            <span class="n">regions</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">yield_from_bed</span><span class="p">(</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="n">regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">-</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">regions</span> <span class="o">=</span> <span class="n">values</span>
+        <span class="n">regions</span> <span class="o">=</span> <span class="p">[</span><span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Region</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">]</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">regions</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RegionRefNameParser"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.RegionRefNameParser">[docs]</a><span class="k">class</span> <span class="nc">RegionRefNameParser</span><span class="p">(</span><span class="n">RegionParser</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse regions, retaining only region ref_names.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">regions</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">((</span><span class="n">r</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">r</span><span class="o">.</span><span class="n">end</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">)):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;WARNING: This program can only process entire &#39;</span> <span class="o">+</span>
+                  <span class="s1">&#39;contigs, ignoring region start and end coordinates.&#39;</span><span class="p">)</span>
+            <span class="c1"># keep regions in order and avoid duplicating ref_names.</span>
+            <span class="n">ref_names</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">ref_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                    <span class="n">ref_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">ref_name</span><span class="p">)</span>
+            <span class="n">regions</span> <span class="o">=</span> <span class="p">[</span><span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Region</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">ref_names</span><span class="p">]</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">regions</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_log_level</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Parser to set logging level and acquire software version/commit&quot;&quot;&quot;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1">#parser.add_argument(&#39;--version&#39;, action=&#39;version&#39;, version=get_version())</span>
+
+    <span class="n">modify_log_level</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+    <span class="n">modify_log_level</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--debug&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_const&#39;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;log_level&#39;</span><span class="p">,</span> <span class="n">const</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Verbose logging of debug information.&#39;</span><span class="p">)</span>
+    <span class="n">modify_log_level</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--quiet&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_const&#39;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;log_level&#39;</span><span class="p">,</span> <span class="n">const</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Minimal logging; warnings only).&#39;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_model_arg</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--model&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">ResolveModel</span><span class="p">,</span>
+            <span class="n">default</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">default_models</span><span class="p">[</span><span class="s1">&#39;consensus&#39;</span><span class="p">],</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Model to use.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_rg_arg</span><span class="p">():</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">rg_group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s1">&#39;read group&#39;</span><span class="p">,</span> <span class="s1">&#39;Filtering alignments the read group (RG) tag, expected to be string value.&#39;</span><span class="p">)</span>
+    <span class="n">rg_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--RG&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;READGROUP&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Read group to select.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_align_chunking</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s1">&#39;CONSENSUS2VCF&#39;</span><span class="p">,</span> <span class="s1">&#39;consensus to &#39;</span>
+                                      <span class="o">+</span> <span class="s1">&#39; reference alignment options.&#39;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--chunk_size&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span>
+                       <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Size of consensus chunks&#39;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--pad&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span>
+                       <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference chunks are chunk_size + pad.&#39;</span><span class="p">)</span>
+    <span class="n">group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--mode&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;HWT&#39;</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;NW&#39;</span><span class="p">,</span> <span class="s1">&#39;HW&#39;</span><span class="p">,</span> <span class="s1">&#39;HWT&#39;</span><span class="p">],</span>
+                       <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Edlib alignment mode. &#39;</span> <span class="o">+</span>
+                       <span class="s1">&#39;NW: global in consensus and ref. &#39;</span> <span class="o">+</span>
+                       <span class="s1">&#39;HW: global in consensus, local in ref. &#39;</span> <span class="o">+</span>
+                       <span class="s1">&#39;HWT: same as HW, but alignments trimmed to &#39;</span> <span class="o">+</span>
+                       <span class="s1">&#39;start and end on a match.&#39;</span>
+                       <span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_regions_or_bed_args</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--regions&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">RegionParser</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Genomic regions to analyse, or a bed file.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_region_ref_names</span><span class="p">():</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--regions&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">RegionRefNameParser</span><span class="p">,</span>
+                        <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Genomic ref_names to process, or a bed file.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_chunking_feature_args</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">chunk_len</span><span class="o">=</span><span class="mi">10000</span><span class="p">,</span> <span class="n">chunk_ovlp</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span> <span class="n">add_help</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--batch_size&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Inference batch size.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--chunk_len&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">chunk_len</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Chunk length of samples.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--chunk_ovlp&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">chunk_ovlp</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Overlap of chunks.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<span class="k">def</span> <span class="nf">_validate_common_args</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Do some common argument validation.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ValidArgs&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;bam&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">bam</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">RG</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">RG</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;RG&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">CheckBam</span><span class="o">.</span><span class="n">check_read_groups</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="n">RG</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">RG</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Reads will be filtered to only those with RG tag: </span><span class="si">{}</span><span class="s2">&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">RG</span><span class="p">))</span>
+    <span class="c1"># if model is default, resolve to file, save mess in help text</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;model&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resolve_model</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="print_model_path"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.print_model_path">[docs]</a><span class="k">def</span> <span class="nf">print_model_path</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="is_rle_model"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.is_rle_model">[docs]</a><span class="k">def</span> <span class="nf">is_rle_model</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">is_rle_encoder</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="is_rle_encoder"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.is_rle_encoder">[docs]</a><span class="k">def</span> <span class="nf">is_rle_encoder</span><span class="p">(</span><span class="n">model_name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Return encoder used by model&quot;&quot;&quot;</span>
+    <span class="n">rle_encoders</span> <span class="o">=</span> <span class="p">[</span><span class="n">medaka</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">HardRLEFeatureEncoder</span><span class="p">]</span>
+    <span class="n">modelstore</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">open_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+    <span class="n">encoder</span> <span class="o">=</span> <span class="n">modelstore</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="s1">&#39;feature_encoder&#39;</span><span class="p">)</span>
+    <span class="n">is_rle</span> <span class="o">=</span> <span class="nb">issubclass</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">encoder</span><span class="p">),</span> <span class="n">medaka</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">HardRLEFeatureEncoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">is_rle</span></div>
+
+
+<div class="viewcode-block" id="get_alignment_params"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.get_alignment_params">[docs]</a><span class="k">def</span> <span class="nf">get_alignment_params</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">is_rle_encoder</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+        <span class="n">align_params</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">alignment_params</span><span class="p">[</span><span class="s1">&#39;rle&#39;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">align_params</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">alignment_params</span><span class="p">[</span><span class="s1">&#39;non-rle&#39;</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">align_params</span></div>
+
+
+<div class="viewcode-block" id="print_alignment_params"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.print_alignment_params">[docs]</a><span class="k">def</span> <span class="nf">print_alignment_params</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">get_alignment_params</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="print_all_models"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.print_all_models">[docs]</a><span class="k">def</span> <span class="nf">print_all_models</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Available:&#39;</span><span class="p">,</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">allowed_models</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;consensus&#39;</span><span class="p">,</span> <span class="s1">&#39;snp&#39;</span><span class="p">,</span> <span class="s1">&#39;variant&#39;</span><span class="p">):</span>
+        <span class="c1"># medaka_variant relies on this order</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Default </span><span class="si">{}</span><span class="s1">: &#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">default_models</span><span class="p">[</span><span class="n">key</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="fastrle"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.fastrle">[docs]</a><span class="k">def</span> <span class="nf">fastrle</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="kn">import</span> <span class="nn">libmedaka</span>
+    <span class="n">libmedaka</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">fastrle</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">encode</span><span class="p">(),</span> <span class="n">args</span><span class="o">.</span><span class="n">block_size</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="download_models"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.download_models">[docs]</a><span class="k">def</span> <span class="nf">download_models</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ResolveModels&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">allowed_models</span><span class="p">:</span>
+        <span class="n">fp</span> <span class="o">=</span> <span class="n">ResolveModel</span><span class="o">.</span><span class="n">resolve_model</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Model </span><span class="si">{}</span><span class="s1"> resolves to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">fp</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="StoreDict"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.StoreDict">[docs]</a><span class="k">class</span> <span class="nc">StoreDict</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Converts &#39;key1=value1 key2=value1a,value2a&#39; to a dictionary.</span>
+
+<span class="sd">        List values are supported, as are simple type conversions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">str_to_type</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;None&#39;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s1">&#39;True&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;true&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;false&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s1">&#39;TRUE&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s1">&#39;FALSE&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+
+        <span class="k">def</span> <span class="nf">_str_to_numeric</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">x</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                <span class="k">except</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">x</span>
+
+        <span class="n">my_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">kv</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+            <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">kv</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)</span>
+            <span class="n">list_like</span> <span class="o">=</span> <span class="s1">&#39;,&#39;</span> <span class="ow">in</span> <span class="n">value</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">str_to_type</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">list_like</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="p">[</span><span class="n">_str_to_numeric</span><span class="p">(</span><span class="n">str_to_type</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="n">x</span><span class="p">))</span>
+                        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">value</span> <span class="o">=</span> <span class="n">_str_to_numeric</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">my_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="n">my_dict</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="kn">from</span> <span class="nn">medaka</span> <span class="kn">import</span> <span class="n">__version__</span>
+    <span class="c1"># Some users report setting this helps them resolve issues on their</span>
+    <span class="c1"># filesystems. </span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s1">&#39;HDF5_USE_FILE_LOCKING&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;FALSE&#39;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="s1">&#39;medaka&#39;</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">subparsers</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;subcommands&#39;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s1">&#39;valid commands&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;additional help&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;command&#39;</span><span class="p">)</span>
+    <span class="n">subparsers</span><span class="o">.</span><span class="n">required</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--version&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;version&#39;</span><span class="p">,</span>
+        <span class="n">version</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(prog)s</span><span class="s1"> </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">__version__</span><span class="p">))</span>
+
+    <span class="c1"># Compress bam file_ext</span>
+    <span class="n">rparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;compress_bam&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Compress an alignment into RLE form. &#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_regions_or_bed_args</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">rparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">rle</span><span class="o">.</span><span class="n">compress_bam</span><span class="p">)</span>
+    <span class="n">rparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;bam_input&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Bam file to compress.&#39;</span><span class="p">)</span>
+    <span class="n">rparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;bam_output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output bam file.&#39;</span><span class="p">)</span>
+    <span class="n">rparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fname&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference fasta file used for `bam_input`.&#39;</span><span class="p">)</span>
+    <span class="n">rparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads for parallel execution.&#39;</span><span class="p">)</span>
+
+    <span class="n">rparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--use_fast5_info&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s1">&#39;&lt;fast5_dir&gt; &lt;index&gt;&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s1">&#39;Root directory containing the fast5 files and .tsv file with &#39;</span>
+            <span class="s1">&#39;columns filename and read_id.&#39;</span><span class="p">))</span>
+
+
+    <span class="c1"># Creation of feature files</span>
+    <span class="n">fparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;features&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Create features for inference.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_chunking_feature_args</span><span class="p">(),</span> <span class="n">_regions_or_bed_args</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">create_samples</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;bam&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input alignments.&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">CheckBam</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output features file.&#39;</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--truth&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Bam of truth aligned to ref to create features for training.&#39;</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--truth_haplotag&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Two-letter tag defining haplotype of alignments for polyploidy labels.&#39;</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads for parallel execution.&#39;</span><span class="p">)</span>
+    <span class="c1"># TODO: enable other label schemes.</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--label_scheme&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;HaploidLabelScheme&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Labelling scheme.&#39;</span><span class="p">,</span>
+                         <span class="n">choices</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">medaka</span><span class="o">.</span><span class="n">labels</span><span class="o">.</span><span class="n">label_schemes</span><span class="p">))</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--label_scheme_args&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">StoreDict</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;KEY1=VAL1 KEY2=VAL2a,VAL2b...&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Label scheme key-word arguments.&quot;</span><span class="p">)</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--feature_encoder&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;CountsFeatureEncoder&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;FeatureEncoder used to create the features.&#39;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">medaka</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">feature_encoders</span><span class="p">))</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--feature_encoder_args&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">StoreDict</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;KEY1=VAL1 KEY2=VAL2a,VAL2b...&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Feature encoder key-word arguments.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Training program</span>
+    <span class="n">tparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;train&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Train a model from features.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">training</span><span class="o">.</span><span class="n">train</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;features&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Paths to training data.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--train_name&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;keras_train&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Name for training run.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--model&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">ResolveModel</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Model definition and initial weights .hdf, or .yml with kwargs to build model.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--epochs&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Maximum number of trainig epochs.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--batch_size&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Training batch size.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--max_samples&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Only train on max_samples.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--mini_epochs&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reduce fraction of data per epoch by this factor&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--seed&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Seed for random batch shuffling.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads_io&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads for parallel IO.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--device&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;GPU device to use.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--optimizer&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;rmsprop&#39;</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;nadam&#39;</span><span class="p">,</span><span class="s1">&#39;rmsprop&#39;</span><span class="p">],</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Optimizer to use.&#39;</span><span class="p">)</span>
+    <span class="n">tparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--optim_args&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">StoreDict</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;KEY1=VAL1,KEY2=VAL2...&quot;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Optimizer key-word arguments.&quot;</span><span class="p">)</span>
+
+    <span class="n">vgrp</span> <span class="o">=</span> <span class="n">tparser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+    <span class="n">vgrp</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--validation_split&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Fraction of data to validate on.&#39;</span><span class="p">)</span>
+    <span class="n">vgrp</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--validation_features&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Paths to validation data&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Consensus from bam input</span>
+    <span class="n">cparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;consensus&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Run inference from a trained model and alignments.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_chunking_feature_args</span><span class="p">(),</span> <span class="n">_regions_or_bed_args</span><span class="p">(),</span> <span class="n">_model_arg</span><span class="p">(),</span> <span class="n">_rg_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">prediction</span><span class="o">.</span><span class="n">predict</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;bam&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input alignments.&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">CheckBam</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output file.&#39;</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads used by inference.&#39;</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--check_output&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Verify integrity of output file after inference.&#39;</span><span class="p">)</span>
+    <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--save_features&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Save features with consensus probabilities.&#39;</span><span class="p">)</span>
+    <span class="n">tag_group</span> <span class="o">=</span> <span class="n">cparser</span><span class="o">.</span><span class="n">add_argument_group</span><span class="p">(</span><span class="s1">&#39;filter tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Filtering alignments by an integer valued tag.&#39;</span><span class="p">)</span>
+    <span class="n">tag_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--tag_name&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Two-letter tag name.&#39;</span><span class="p">)</span>
+    <span class="n">tag_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--tag_value&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Value of tag.&#39;</span><span class="p">)</span>
+    <span class="n">tag_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--tag_keep_missing&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Keep alignments when tag is missing.&#39;</span><span class="p">)</span>
+
+
+    <span class="c1"># Consensus from single-molecules with subreads</span>
+    <span class="n">smparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;smolecule&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Create consensus sequences from single-molecule reads.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_chunking_feature_args</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">chunk_len</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">chunk_ovlp</span><span class="o">=</span><span class="mi">500</span><span class="p">),</span> <span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">smolecule</span><span class="o">.</span><span class="n">main</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output directory.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;fasta&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Single-molecule reads, one file per read.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--method&#39;</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;racon&#39;</span><span class="p">,</span> <span class="s1">&#39;spoa&#39;</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;spoa&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Pre-medaka consensus generation method.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--depth&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Minimum subread count.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--length&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Minimum median subread length.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads used by inference.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--check_output&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Verify integrity of output file after inference.&#39;</span><span class="p">)</span>
+    <span class="n">smparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--save_features&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Save features with consensus probabilities.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Consensus from features input</span>
+    <span class="n">cfparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;consensus_from_features&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Run inference from a trained model on existing features.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="c1"># TODO: why doesn&#39;t this have a .set_defaults?</span>
+    <span class="n">cfparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;features&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Pregenerated features (from medaka features).&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Compression of fasta/q to quality-RLE fastq</span>
+    <span class="n">rleparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;fastrle&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Create run-length encoded fastq (lengths in quality track).&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">rleparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">fastrle</span><span class="p">)</span>
+    <span class="n">rleparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;input&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input fasta/q. may be gzip compressed.&#39;</span><span class="p">)</span>
+    <span class="n">rleparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--block_size&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">CheckBlockSize</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">94</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Block size for hompolymer splitting, e.g. with a value of blocksize=3, AAAA -&gt; A3 A1.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Post-processing of consensus outputs</span>
+    <span class="n">sparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;stitch&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Stitch together output from medaka consensus into final output.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_region_ref_names</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">stitch</span><span class="o">.</span><span class="n">stitch</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;inputs&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Consensus .hdf files.&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;draft&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Draft .fasta. Consensus gaps will be filled with unpolished &#39;</span>
+        <span class="s1">&#39;draft sequence to avoid contig fragmentation.&#39;</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .fasta.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;consensus.fasta&#39;</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threads&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of worker processes to use.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">sparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--no-fillgaps&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Don&#39;t fill gaps in consensus sequence with draft sequence.&quot;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_false&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;fillgaps&#39;</span><span class="p">)</span>
+
+    <span class="n">var_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;variant&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Decode probabilities to VCF.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_region_ref_names</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">variant</span><span class="o">.</span><span class="n">variants_from_hdf</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference sequence .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;inputs&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Consensus .hdf files.&#39;</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .vcf.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;medaka.vcf&#39;</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--verbose&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Populate VCF info fields.&#39;</span><span class="p">)</span>
+    <span class="n">var_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--ambig_ref&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Decode variants at ambiguous reference positions.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># TODO do we still need this?</span>
+    <span class="n">snp_parser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;snp&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Decode probabilities to SNPs.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_region_ref_names</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">variant</span><span class="o">.</span><span class="n">snps_from_hdf</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference sequence .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;inputs&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Consensus .hdf files.&#39;</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .vcf.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;medaka.vcf&#39;</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--threshold&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.04</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                            <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Threshold for considering secondary calls. A value of 1 will result in haploid decoding.&#39;</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--ref_vcf&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference vcf.&#39;</span><span class="p">)</span>
+    <span class="n">snp_parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--verbose&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Populate VCF info fields.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Tools</span>
+    <span class="n">toolparser</span> <span class="o">=</span> <span class="n">subparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;tools&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;tools subcommand.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">toolsubparsers</span> <span class="o">=</span> <span class="n">toolparser</span><span class="o">.</span><span class="n">add_subparsers</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s1">&#39;tools&#39;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s1">&#39;valid tool commands&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;additional help&#39;</span><span class="p">,</span> <span class="n">dest</span><span class="o">=</span><span class="s1">&#39;tool_command&#39;</span><span class="p">)</span>
+
+    <span class="c1"># merge two haploid VCFs into a diploid VCF.</span>
+    <span class="n">h2dparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;haploid2diploid&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Merge two haploid VCFs into a diploid VCF.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">haploid2diploid</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf1&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf2&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcfout&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .vcf.&#39;</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--discard_phase&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                           <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;output unphased diploid vcf&#39;</span><span class="p">)</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--adjacent&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Merge adjacent variants (i.e. variants with non-overlapping genomic ranges) instead&#39;</span> <span class="o">+</span>
+                               <span class="s1">&#39; of just overlapping ones. If set to True, all runs of adjacent variants will be&#39;</span> <span class="o">+</span>
+                               <span class="s1">&#39; merged including those which appear in just one of the input VCFs.&#39;</span><span class="p">))</span>
+    <span class="n">h2dparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--split_mnp&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Split each mnp into multiple snps.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># split a diploid VCF into two haploid VCFs.</span>
+    <span class="n">d2hparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;diploid2haploid&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Split a diploid VCF into two haploid VCFs.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">d2hparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">diploid2haploid</span><span class="p">)</span>
+    <span class="n">d2hparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">d2hparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--notrim&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Do not trim variant to minimal ref and alt and update pos.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># classify variants in a vcf writing new vcfs containing subs, indels etc.</span>
+    <span class="n">clparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;classify_variants&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Classify variants and write vcf for each type and subtype.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">clparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">classify_variants</span><span class="p">)</span>
+    <span class="n">clparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">clparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--replace_info&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Replace info tag (useful for visual inspection of types).&#39;</span><span class="p">)</span>
+
+    <span class="c1"># annotate vcf with read depth and supporting reads info</span>
+    <span class="n">annparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;annotate&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Annotate vcf with read depth and supporting reads info fields.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_rg_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">annotate_vcf_n_reads</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;bam&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input alignments.&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">CheckBam</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcfout&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .vcf.&#39;</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--chunk_size&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">500000</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Chunk size for building pileups.&#39;</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--pad&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Padding width either side of variant for realignment.&#39;</span><span class="p">)</span>
+    <span class="n">annparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--dpsp&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Calulate depth and alignment score of spanning reads&#39;</span><span class="p">)</span>
+
+    <span class="c1"># call variants by alignment of a consensus sequence to a reference</span>
+    <span class="n">c2vparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;consensus2vcf&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Call variants by alignment of a consensus sequence to a reference.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_align_chunking</span><span class="p">(),</span> <span class="n">_region_ref_names</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">c2vparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">variant</span><span class="o">.</span><span class="n">vcf_from_fasta</span><span class="p">)</span>
+    <span class="n">c2vparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;consensus&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input consensus .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">c2vparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">c2vparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--bam&#39;</span><span class="p">,</span>
+                           <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Existing bam file.&#39;</span><span class="p">)</span>
+    <span class="n">c2vparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--out_prefix&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;consensus2vcf&#39;</span><span class="p">,</span>
+                           <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output prefix for .bam and .vcf files.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># convert a vcf to tsv</span>
+    <span class="n">tsvparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;vcf2tsv&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;convert vcf to tsv, unpacking info and sample columns.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">tsvparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">vcf2tsv</span><span class="p">)</span>
+    <span class="n">tsvparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># find homozygous and heterozygous regions in a VCF</span>
+    <span class="n">hzregparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;homozygous_regions&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Find homozygous regions from a diploid vcf.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">hzregparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">vcf</span><span class="o">.</span><span class="n">get_homozygous_regions</span><span class="p">)</span>
+    <span class="n">hzregparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;vcf&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input .vcf file.&#39;</span><span class="p">)</span>
+    <span class="n">hzregparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;region&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Genomic region within which to find homozygous sub-regions.&#39;</span><span class="p">)</span>
+    <span class="n">hzregparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--min_len&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+                             <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Minimum region length.&#39;</span><span class="p">)</span>
+    <span class="n">hzregparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--suffix&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output suffix.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;regions.txt&#39;</span><span class="p">)</span>
+
+    <span class="c1"># resolve model and print full model file path to screen</span>
+    <span class="n">rmparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;resolve_model&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Resolve model and print full file path.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">rmparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">print_model_path</span><span class="p">)</span>
+
+    <span class="c1"># check if feature encoder is RLE</span>
+    <span class="n">rleparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;is_rle_model&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Check if a model is an RLE model.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">rleparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">is_rle_model</span><span class="p">)</span>
+
+    <span class="c1"># Request alignments parameters for model</span>
+    <span class="n">alignmentparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;get_alignment_params&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Get alignment parameters appropriate for a model&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">alignmentparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">print_alignment_params</span><span class="p">)</span>
+
+    <span class="c1"># append RLE tags to a bam from hdf</span>
+    <span class="n">rlebamparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;rlebam&#39;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s1">&#39;Add RLE tags from HDF to bam. (input bam from stdin)&#39;</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">rlebamparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;read_index&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Two column .tsv mapping read_ids to .hdf filepaths.&#39;</span><span class="p">)</span>
+    <span class="n">rlebamparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--workers&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of worker processes.&#39;</span><span class="p">)</span>
+    <span class="n">rlebamparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">rle</span><span class="o">.</span><span class="n">rlebam</span><span class="p">)</span>
+
+    <span class="c1"># print all model tags followed by default</span>
+    <span class="n">lmparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;list_models&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;List all models.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">_model_arg</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">lmparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">print_all_models</span><span class="p">)</span>
+
+    <span class="c1"># write a bed file of regions spanned by a hdf feature / probs file.</span>
+    <span class="n">bdparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;hdf_to_bed&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Write a bed file of regions spanned by a hdf file.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">bdparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">variant</span><span class="o">.</span><span class="n">samples_to_bed</span><span class="p">)</span>
+    <span class="n">bdparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;inputs&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">,</span>
+                          <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Consensus .hdf files.&#39;</span><span class="p">)</span>
+    <span class="n">bdparser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;output&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output .bed.&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;medaka.bed&#39;</span><span class="p">)</span>
+
+    <span class="c1"># resolve all available models, downloading missing ones.</span>
+    <span class="n">dwnldparser</span> <span class="o">=</span> <span class="n">toolsubparsers</span><span class="o">.</span><span class="n">add_parser</span><span class="p">(</span><span class="s1">&#39;download_models&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Download model files for any models not already installed.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">()],</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">)</span>
+    <span class="n">dwnldparser</span><span class="o">.</span><span class="n">set_defaults</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="n">download_models</span><span class="p">)</span>
+
+
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+    <span class="c1"># https://github.com/tensorflow/tensorflow/issues/26691</span>
+    <span class="c1"># we have local imports of tf generally, but this is pseudo global</span>
+    <span class="c1"># however with tf1.14 tensorflow import time looks faster than previous</span>
+    <span class="c1"># so we could/should stick to more standard imports</span>
+    <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+    <span class="kn">import</span> <span class="nn">absl.logging</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">absl</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">_absl_handler</span><span class="p">)</span>
+    <span class="n">absl</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">_warn_preinit_stderr</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s1">&#39;[</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1">] </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="s1">&#39;%H:%M:%S&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">log_level</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="o">==</span> <span class="s1">&#39;tools&#39;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="s1">&#39;func&#39;</span><span class="p">):</span>
+        <span class="c1"># display help if given `medaka tools (--help)`</span>
+        <span class="n">toolparser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_validate_common_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+
+<span class="k">def</span> <span class="nf">_haploid_variant_argparser</span><span class="p">():</span>
+    <span class="n">fparser</span> <span class="o">=</span> <span class="n">_chunking_feature_args</span><span class="p">()</span>
+    <span class="n">fparser</span><span class="o">.</span><span class="n">_action_groups</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s1">&#39;medaka consensus batching options.&#39;</span>
+    <span class="n">mparser</span> <span class="o">=</span> <span class="n">_model_arg</span><span class="p">()</span>
+    <span class="n">mparser</span><span class="o">.</span><span class="n">_action_groups</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="s1">&#39;medaka consensus model options.&#39;</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="s1">&#39;medaka_haploid_variant&#39;</span><span class="p">,</span>
+        <span class="n">formatter_class</span><span class="o">=</span><span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentDefaultsHelpFormatter</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s1">&#39;Haploid variant calling pipeline.&#39;</span><span class="p">,</span>
+        <span class="n">parents</span><span class="o">=</span><span class="p">[</span><span class="n">_log_level</span><span class="p">(),</span> <span class="n">fparser</span><span class="p">,</span> <span class="n">mparser</span><span class="p">,</span> <span class="n">_align_chunking</span><span class="p">()],</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;reads_fastx&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Input reads (can be gzipped).&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;ref_fasta&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Reference sequence .fasta file.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-o&#39;</span><span class="p">,</span> <span class="s1">&#39;--output_dir&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s1">&#39;medaka_haploid_variant&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Output directory, should not exist.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;-t&#39;</span><span class="p">,</span> <span class="s1">&#39;--threads&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Number of threads used by inference.&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parser</span>
+
+
+<div class="viewcode-block" id="haploid_variant_cmdline"><a class="viewcode-back" href="../../medaka.html#medaka.medaka.haploid_variant_cmdline">[docs]</a><span class="k">def</span> <span class="nf">haploid_variant_cmdline</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Command line haploid variant calling tool.&quot;&quot;&quot;</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">_haploid_variant_argparser</span><span class="p">()</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    <span class="n">_validate_common_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s1">&#39;[</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1">] </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">datefmt</span><span class="o">=</span><span class="s1">&#39;%H:%M:%S&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">log_level</span><span class="p">)</span>
+
+    <span class="n">medaka</span><span class="o">.</span><span class="n">wrappers</span><span class="o">.</span><span class="n">haploid_variant</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

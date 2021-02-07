@@ -1,0 +1,346 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.wrappers &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.wrappers</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.wrappers</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Convenience pipelines and wrappers for command line tools.&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">from</span> <span class="nn">timeit</span> <span class="kn">import</span> <span class="n">default_timer</span> <span class="k">as</span> <span class="n">now</span>
+
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+
+
+<div class="viewcode-block" id="racon"><a class="viewcode-back" href="../../medaka.html#medaka.wrappers.racon">[docs]</a><span class="k">def</span> <span class="nf">racon</span><span class="p">(</span><span class="n">reads_fx</span><span class="p">,</span> <span class="n">scaf_fasta</span><span class="p">,</span> <span class="n">paf_out</span><span class="p">,</span> <span class="n">fasta_out</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Polish scaffold using racon.</span>
+
+<span class="sd">    Assumes minimap2, bgzip and racon are in the path.</span>
+
+<span class="sd">    :param reads_fx: str, input reads filepath.</span>
+<span class="sd">    :param scaf_fasta: str, input scaffold fasta filepath.</span>
+<span class="sd">    :param paf_out: str, output paf filepath.</span>
+<span class="sd">    :param fasta_out: str, output racon consensus filepath.</span>
+<span class="sd">    :param threads: int, number of threads to use for minimap2 and racon.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">threads</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;DRAFT_NORM&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">out_fp</span><span class="p">):</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_fp</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+            <span class="n">p1</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+            <span class="n">p2</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s1">&#39;bgzip&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">],</span> <span class="n">stdin</span><span class="o">=</span><span class="n">p1</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">fh</span><span class="p">)</span>
+            <span class="n">p1</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>  <span class="c1"># Allow p1 to receive a SIGPIPE if p2 exits.</span>
+            <span class="n">_</span> <span class="o">=</span> <span class="n">p2</span><span class="o">.</span><span class="n">communicate</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">aln_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;minimap2&#39;</span><span class="p">,</span> <span class="s1">&#39;-x&#39;</span><span class="p">,</span> <span class="s1">&#39;map-ont&#39;</span><span class="p">,</span> <span class="s1">&#39;-t&#39;</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">scaf_fasta</span><span class="p">,</span>
+               <span class="n">reads_fx</span><span class="p">]</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Aligning reads.&#39;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">aln_cmd</span><span class="p">))</span>
+    <span class="n">run</span><span class="p">(</span><span class="n">aln_cmd</span><span class="p">,</span> <span class="n">paf_out</span><span class="p">)</span>
+
+    <span class="n">racon_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;racon&#39;</span><span class="p">,</span> <span class="s1">&#39;--include-unpolished&#39;</span><span class="p">,</span> <span class="s1">&#39;--no-trimming&#39;</span><span class="p">,</span> <span class="s1">&#39;-q&#39;</span><span class="p">,</span> <span class="s1">&#39;-1&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;-t&#39;</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">reads_fx</span><span class="p">,</span> <span class="n">paf_out</span><span class="p">,</span> <span class="n">scaf_fasta</span><span class="p">]</span>
+
+    <span class="n">t1</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Creating normalised draft by running racon.&#39;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">racon_cmd</span><span class="p">))</span>
+    <span class="n">run</span><span class="p">(</span><span class="n">racon_cmd</span><span class="p">,</span> <span class="n">fasta_out</span><span class="p">)</span>
+    <span class="n">t2</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Racon consensus took </span><span class="si">{:.2f}</span><span class="s1">s (</span><span class="si">{:.2f}</span><span class="s1"> for PAF, </span><span class="si">{:.2f}</span><span class="s1"> for Racon).&#39;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">t2</span> <span class="o">-</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t1</span> <span class="o">-</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t2</span> <span class="o">-</span> <span class="n">t1</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Racon consensus written to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fasta_out</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="minimap2"><a class="viewcode-back" href="../../medaka.html#medaka.wrappers.minimap2">[docs]</a><span class="k">def</span> <span class="nf">minimap2</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">out_bam</span><span class="p">,</span> <span class="n">preset</span><span class="o">=</span><span class="s1">&#39;map-ont&#39;</span><span class="p">,</span> <span class="n">extra_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+             <span class="n">threads</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Align query to reference with minimap2 and sort and index bam.</span>
+
+<span class="sd">    :param query: str, query filepath.</span>
+<span class="sd">    :param ref: str, reference filepath.</span>
+<span class="sd">    :param out_bam: str, output filepath.</span>
+<span class="sd">    :param preset: str, minimap2 -x option.</span>
+<span class="sd">    :param extra_args: iterable of str, any other minimap2 options which are</span>
+<span class="sd">        applied after preset.</span>
+<span class="sd">    :param threads: int, number of threads to use for alignment and sorting.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">threads</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">extra_args</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">extra_args</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">extra_args</span><span class="p">)</span>
+
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ALIGN&#39;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Aligning </span><span class="si">{}</span><span class="s1"> to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">ref</span><span class="p">))</span>
+    <span class="n">aln_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;minimap2&#39;</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="s1">&#39;-x&#39;</span><span class="p">,</span> <span class="n">preset</span><span class="p">,</span> <span class="s1">&#39;-t&#39;</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="s1">&#39;-a&#39;</span><span class="p">,</span>
+               <span class="s1">&#39;--secondary=no&#39;</span><span class="p">,</span> <span class="s1">&#39;--MD&#39;</span><span class="p">,</span> <span class="s1">&#39;-L&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">extra_args</span>
+    <span class="n">sort_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;samtools&#39;</span><span class="p">,</span> <span class="s1">&#39;sort&#39;</span><span class="p">,</span> <span class="s1">&#39;--output-fmt&#39;</span><span class="p">,</span> <span class="s1">&#39;BAM&#39;</span><span class="p">,</span> <span class="s1">&#39;-o&#39;</span><span class="p">,</span> <span class="n">out_bam</span><span class="p">,</span>
+                <span class="s1">&#39;-@&#39;</span><span class="p">,</span> <span class="n">threads</span><span class="p">]</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">aln_cmd</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;|&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">sort_cmd</span><span class="p">))</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">aln_cmd</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">sort_cmd</span><span class="p">,</span> <span class="n">stdin</span><span class="o">=</span><span class="n">p1</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">p1</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>  <span class="c1"># Allow p1 to receive a SIGPIPE if p2 exits.</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">p2</span><span class="o">.</span><span class="n">communicate</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Indexing bam&#39;</span><span class="p">)</span>
+    <span class="n">index_cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;samtools&#39;</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="n">out_bam</span><span class="p">,</span> <span class="s1">&#39;-@&#39;</span><span class="p">,</span> <span class="n">threads</span><span class="p">]</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">index_cmd</span><span class="p">))</span>
+    <span class="n">p3</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">index_cmd</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">_</span> <span class="o">=</span> <span class="n">p3</span><span class="o">.</span><span class="n">communicate</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;BAM written to </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">out_bam</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="haploid_variant"><a class="viewcode-back" href="../../medaka.html#medaka.wrappers.haploid_variant">[docs]</a><span class="k">def</span> <span class="nf">haploid_variant</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Command line haploid variant calling tool.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;HAPLOID_VARIANT&#39;</span><span class="p">)</span>
+    <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">mkdir_p</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">info</span><span class="o">=</span><span class="s1">&#39;May using existing results.&#39;</span><span class="p">)</span>
+
+    <span class="n">paf_fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;reads_to_ref.paf.gz&#39;</span><span class="p">)</span>
+    <span class="n">racon_cons_fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;racon.fa.gz&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">racon_cons_fp</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Racon consensus exists, skipping.&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">racon</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">reads_fastx</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">ref_fasta</span><span class="p">,</span> <span class="n">paf_fp</span><span class="p">,</span> <span class="n">racon_cons_fp</span><span class="p">,</span>
+              <span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">reads_to_draft_bam_fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;calls_to_draft.bam&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">reads_to_draft_bam_fp</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Skipping alignment of reads to draft, bam exists.&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Aligning reads to draft.&#39;</span><span class="p">)</span>
+        <span class="c1"># if args.regions is subset of args.ref_fasta contigs, align</span>
+        <span class="n">minimap2</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">reads_fastx</span><span class="p">,</span> <span class="n">racon_cons_fp</span><span class="p">,</span> <span class="n">reads_to_draft_bam_fp</span><span class="p">,</span>
+                 <span class="n">threads</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">)</span>
+
+    <span class="n">args</span><span class="o">.</span><span class="n">bam</span> <span class="o">=</span> <span class="n">reads_to_draft_bam_fp</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">regions</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">consensus_probs_fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;consensus_probs.hdf&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">consensus_probs_fp</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Skipping medaka consensus, consensus probs exist.&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Running medaka consensus.&#39;</span><span class="p">)</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">consensus_probs_fp</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">check_output</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">save_features</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">tag_name</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">tag_value</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">RG</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">tag_keep_missing</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">medaka</span><span class="o">.</span><span class="n">prediction</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">consensus_fasta_fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;consensus.fasta&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">consensus_fasta_fp</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Skipping medaka stitch, consensus fasta exists.&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Running medaka stitch.&#39;</span><span class="p">)</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">consensus_probs_fp</span><span class="p">]</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">consensus_fasta_fp</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">draft</span> <span class="o">=</span> <span class="n">racon_cons_fp</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">fillgaps</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">medaka</span><span class="o">.</span><span class="n">stitch</span><span class="o">.</span><span class="n">stitch</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Running medaka tools consensus2vcf.&#39;</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">bam</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># name clash with reads to draft bam for consensus</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">consensus</span> <span class="o">=</span> <span class="n">consensus_fasta_fp</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">out_prefix</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output_dir</span><span class="p">,</span> <span class="s1">&#39;consensus_to_ref&#39;</span><span class="p">)</span>
+    <span class="n">medaka</span><span class="o">.</span><span class="n">variant</span><span class="o">.</span><span class="n">vcf_from_fasta</span><span class="p">(</span><span class="n">args</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

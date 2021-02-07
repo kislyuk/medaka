@@ -1,0 +1,595 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.rle &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.rle</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.rle</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Run length encoding and realignment of reads.&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">array</span>
+<span class="kn">import</span> <span class="nn">concurrent.futures</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">h5py</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">ont_fast5_api.fast5_interface</span> <span class="kn">import</span> <span class="n">get_fast5_file</span>
+<span class="kn">import</span> <span class="nn">pysam</span>
+
+<span class="kn">import</span> <span class="nn">medaka.align</span>
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+<span class="kn">import</span> <span class="nn">medaka.smolecule</span>
+
+
+<div class="viewcode-block" id="rle"><a class="viewcode-back" href="../../medaka.html#medaka.rle.rle">[docs]</a><span class="k">def</span> <span class="nf">rle</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculate a run length encoding (rle), of an input iterable.</span>
+
+<span class="sd">    :param iterable: input iterable.</span>
+
+<span class="sd">    :returns: structured array with fields `start`, `length`, and `value`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="n">array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fromiter</span><span class="p">(</span><span class="n">iterable</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;U1&#39;</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">iterable</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">array</span> <span class="o">=</span> <span class="n">iterable</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Input array must be one dimensional.&quot;</span><span class="p">)</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="p">[(</span><span class="s1">&#39;length&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;start&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="n">array</span><span class="o">.</span><span class="n">dtype</span><span class="p">)]</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
+    <span class="n">starts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">array</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">!=</span> <span class="n">array</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">rle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">rle</span><span class="p">[</span><span class="s1">&#39;start&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">starts</span>
+    <span class="n">rle</span><span class="p">[</span><span class="s1">&#39;length&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">r_</span><span class="p">[</span><span class="n">starts</span><span class="p">,</span> <span class="n">n</span><span class="p">])</span>
+    <span class="n">rle</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">array</span><span class="p">[</span><span class="n">starts</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">rle</span></div>
+
+
+<div class="viewcode-block" id="RLEConverter"><a class="viewcode-back" href="../../medaka.html#medaka.rle.RLEConverter">[docs]</a><span class="k">class</span> <span class="nc">RLEConverter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Class to convert a basecall to RLE, with coordinate conversions.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">basecall</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create an RLE conversion helper.</span>
+
+<span class="sd">        :param basecall: string to be converted to RLE.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">basecall</span> <span class="o">=</span> <span class="n">basecall</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span> <span class="o">=</span> <span class="n">rle</span><span class="p">(</span><span class="n">basecall</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">compact_basecall</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">homop_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span><span class="p">[</span><span class="s1">&#39;length&#39;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inverse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span><span class="p">)),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span><span class="p">[</span><span class="s1">&#39;length&#39;</span><span class="p">])</span>
+
+<div class="viewcode-block" id="RLEConverter.trimmed_compact"><a class="viewcode-back" href="../../medaka.html#medaka.rle.RLEConverter.trimmed_compact">[docs]</a>    <span class="k">def</span> <span class="nf">trimmed_compact</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a trimmed compressed sequence.</span>
+
+<span class="sd">        :param start: start co-ordinate in uncompressed sequence.</span>
+<span class="sd">        :param end: end co-ordinate in uncompressed sequence (exclusive).</span>
+
+<span class="sd">        :returns: the trimmed compressed sequence.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">s</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform_coords</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">[</span><span class="n">s</span><span class="p">:</span><span class="n">e</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="RLEConverter.transform_coords"><a class="viewcode-back" href="../../medaka.html#medaka.rle.RLEConverter.transform_coords">[docs]</a>    <span class="k">def</span> <span class="nf">transform_coords</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Transform a slice co-ordinates from the input sequence.</span>
+
+<span class="sd">        :param start: start co-ordinate in uncompressed sequence.</span>
+<span class="sd">        :param end: end co-ordinate in uncompressed sequence (exclusive).</span>
+
+<span class="sd">        :returns: the trimmed compressed sequence.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Visual explanation:</span>
+        <span class="c1"># seq         : AATTCCGG</span>
+        <span class="c1"># seq_i       : 01234567</span>
+        <span class="c1"># rle_i       : 00112233</span>
+        <span class="c1"># search right: 11223344</span>
+        <span class="c1"># =&gt; the slice [0:8] should map to [0:4]</span>
+        <span class="c1"># =&gt; subtract 1 from s; e is fine because we want exclusive</span>
+
+        <span class="c1"># older implementation</span>
+        <span class="c1"># s, e = np.searchsorted(</span>
+        <span class="c1">#     self.rle_conversion[&#39;start&#39;], [start, end - 1], &#39;right&#39;)</span>
+        <span class="c1"># return s - 1, e</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">inverse</span><span class="p">[</span><span class="n">start</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">inverse</span><span class="p">[</span><span class="n">end</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span></div>
+
+<div class="viewcode-block" id="RLEConverter.coord_compact_to_full"><a class="viewcode-back" href="../../medaka.html#medaka.rle.RLEConverter.coord_compact_to_full">[docs]</a>    <span class="k">def</span> <span class="nf">coord_compact_to_full</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coord</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Map from encoded index to full basecall index.</span>
+
+<span class="sd">        :param coord: array_like, compact coordinate(s) to be converted to</span>
+<span class="sd">            full basecall</span>
+
+<span class="sd">        :returns: numpy.ndarray of coordinates</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rle_conversion</span><span class="p">[</span><span class="n">coord</span><span class="p">][</span><span class="s1">&#39;start&#39;</span><span class="p">]</span></div></div>
+
+
+<div class="viewcode-block" id="get_rl_params"><a class="viewcode-back" href="../../medaka.html#medaka.rle.get_rl_params">[docs]</a><span class="k">def</span> <span class="nf">get_rl_params</span><span class="p">(</span><span class="n">read_name</span><span class="p">,</span> <span class="n">read_fast5</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get shape and scale parameters from fast5 for read.&quot;&quot;&quot;</span>
+    <span class="n">data_path</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;read_</span><span class="si">{}</span><span class="s1">/Analyses/Basecall_1D_000/&#39;</span>
+        <span class="s1">&#39;BaseCalled_template/RunlengthBasecall&#39;</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">read_fast5</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">h</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">h</span><span class="p">[</span><span class="n">data_path</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">read_name</span><span class="p">)][()]</span>
+
+    <span class="n">call</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">])</span>
+    <span class="n">wl</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;shape&#39;</span><span class="p">])</span>
+    <span class="n">wk</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;scale&#39;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">call</span><span class="p">,</span> <span class="n">wl</span><span class="p">,</span> <span class="n">wk</span></div>
+
+
+<span class="k">def</span> <span class="nf">_compress_alignment</span><span class="p">(</span><span class="n">alignment</span><span class="p">,</span> <span class="n">ref_rle</span><span class="p">,</span> <span class="n">fast5_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">file_index</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;Compress_bam&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">alignment</span><span class="o">.</span><span class="n">is_unmapped</span> <span class="ow">or</span> <span class="n">alignment</span><span class="o">.</span><span class="n">is_secondary</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Alignment of read </span><span class="si">{}</span><span class="s1"> is unmapped or secondary. Skip.&#39;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">query_rle</span> <span class="o">=</span> <span class="n">RLEConverter</span><span class="p">(</span><span class="n">alignment</span><span class="o">.</span><span class="n">query_sequence</span><span class="p">)</span>
+
+    <span class="c1"># Get aligned query in RLE</span>
+    <span class="n">qstart</span><span class="p">,</span> <span class="n">qend</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">alignment</span><span class="o">.</span><span class="n">query_alignment_start</span><span class="p">,</span> <span class="n">alignment</span><span class="o">.</span><span class="n">query_alignment_end</span><span class="p">)</span>
+    <span class="n">q_compact_start</span><span class="p">,</span> <span class="n">q_compact_end</span> <span class="o">=</span> <span class="n">query_rle</span><span class="o">.</span><span class="n">transform_coords</span><span class="p">(</span><span class="n">qstart</span><span class="p">,</span> <span class="n">qend</span><span class="p">)</span>
+    <span class="n">compact_query</span> <span class="o">=</span> <span class="n">query_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">[</span><span class="n">q_compact_start</span><span class="p">:</span><span class="n">q_compact_end</span><span class="p">]</span>
+
+    <span class="c1"># Get aligned reference in RLE</span>
+    <span class="n">rstart</span><span class="p">,</span> <span class="n">rend</span> <span class="o">=</span> <span class="n">alignment</span><span class="o">.</span><span class="n">reference_start</span><span class="p">,</span> <span class="n">alignment</span><span class="o">.</span><span class="n">reference_end</span>
+    <span class="n">r_compact_start</span><span class="p">,</span> <span class="n">r_compact_end</span> <span class="o">=</span> <span class="n">ref_rle</span><span class="o">.</span><span class="n">transform_coords</span><span class="p">(</span><span class="n">rstart</span><span class="p">,</span> <span class="n">rend</span><span class="p">)</span>
+    <span class="n">compact_ref</span> <span class="o">=</span> <span class="n">ref_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">[</span><span class="n">r_compact_start</span><span class="p">:</span><span class="n">r_compact_end</span><span class="p">]</span>
+
+    <span class="c1"># Calculate new alignment with compressed reads</span>
+    <span class="n">rstart</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">align</span><span class="o">.</span><span class="n">parasail_alignment</span><span class="p">(</span><span class="n">compact_query</span><span class="p">,</span> <span class="n">compact_ref</span><span class="p">)</span>
+
+    <span class="c1"># Cigar is now with respect to the trimmed compact_query, we need to</span>
+    <span class="c1"># return it to the full compact query</span>
+    <span class="n">extra_start_clip</span> <span class="o">=</span> <span class="n">q_compact_start</span>
+    <span class="n">extra_end_clip</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">query_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">)</span> <span class="o">-</span> <span class="n">q_compact_end</span>
+    <span class="n">corrected_cigar</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">align</span><span class="o">.</span><span class="n">add_extra_clipping</span><span class="p">(</span>
+        <span class="n">cigar</span><span class="p">,</span> <span class="n">extra_start_clip</span><span class="p">,</span> <span class="n">extra_end_clip</span><span class="p">)</span>
+    <span class="n">rstart</span> <span class="o">+=</span> <span class="n">r_compact_start</span>
+
+    <span class="c1"># If file_index is present, retrive RLE parameters from fast5 files.</span>
+    <span class="k">if</span> <span class="n">file_index</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fast5_fname</span> <span class="o">=</span> <span class="n">file_index</span><span class="p">[</span><span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s1">&#39;Not found in summary file: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">))</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Get full path from a root path. There should be only ONE file found</span>
+        <span class="c1"># with that name. The recursive is needed to follow symlinks</span>
+        <span class="n">fast5_path</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span>
+            <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/**/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fast5_dir</span><span class="p">,</span> <span class="n">fast5_fname</span><span class="p">),</span> <span class="n">recursive</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fast5_path</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s1">&#39;Found several fast5 with name </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fast5_fname</span><span class="p">))</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">fast5_path</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s1">&#39;Found no fast5 with name </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fast5_fname</span><span class="p">))</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">fast5_path</span> <span class="o">=</span> <span class="n">fast5_path</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fast5_call</span><span class="p">,</span> <span class="n">wl</span><span class="p">,</span> <span class="n">wk</span> <span class="o">=</span> <span class="n">get_rl_params</span><span class="p">(</span>
+                <span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">,</span> <span class="n">fast5_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;RLE table not found for file </span><span class="si">{}</span><span class="s1">, read </span><span class="si">{}</span><span class="s1">&#39;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fast5_path</span><span class="p">,</span> <span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">))</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># params needs flipping for reverse alignments</span>
+        <span class="k">if</span> <span class="n">alignment</span><span class="o">.</span><span class="n">is_reverse</span><span class="p">:</span>
+            <span class="n">wl</span> <span class="o">=</span> <span class="n">wl</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">wk</span> <span class="o">=</span> <span class="n">wk</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">fast5_call</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">reverse_complement</span><span class="p">(</span><span class="n">fast5_call</span><span class="p">)</span>
+
+        <span class="c1"># ocasional errors where bases are repeated</span>
+        <span class="c1"># may lead to discrepancies, discard these</span>
+        <span class="k">if</span> <span class="n">fast5_call</span> <span class="o">!=</span> <span class="n">query_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s1">&#39;RLE table within fast5 file is inconsistent with &#39;</span>
+                <span class="s1">&#39;compressed basecall for read </span><span class="si">{}</span><span class="s1">. </span><span class="si">{}</span><span class="s1"> != </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">,</span>
+                    <span class="n">fast5_call</span><span class="p">,</span>
+                    <span class="n">query_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">))</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;WL&#39;</span><span class="p">:</span> <span class="n">wl</span><span class="p">,</span> <span class="s1">&#39;WK&#39;</span><span class="p">:</span> <span class="n">wk</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="c1"># Create alignment object</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">initialise_alignment</span><span class="p">(</span>
+        <span class="n">alignment</span><span class="o">.</span><span class="n">query_name</span><span class="p">,</span> <span class="n">alignment</span><span class="o">.</span><span class="n">reference_id</span><span class="p">,</span> <span class="n">rstart</span><span class="p">,</span>
+        <span class="n">query_rle</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">,</span> <span class="n">corrected_cigar</span><span class="p">,</span> <span class="n">alignment</span><span class="o">.</span><span class="n">flag</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="n">tags</span><span class="p">,</span>
+        <span class="n">query_qualities</span><span class="o">=</span><span class="n">array</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">query_rle</span><span class="o">.</span><span class="n">homop_length</span><span class="p">,</span> <span class="mi">255</span><span class="p">)))</span>
+
+    <span class="k">return</span> <span class="n">a</span>
+
+
+<span class="k">def</span> <span class="nf">_compress_bam</span><span class="p">(</span><span class="n">bam_input</span><span class="p">,</span> <span class="n">bam_output</span><span class="p">,</span> <span class="n">ref_fname</span><span class="p">,</span>
+                  <span class="n">fast5_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">regions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compress a bam into run length encoding (RLE).</span>
+
+<span class="sd">    :param bam_input: str, name of the bam file to be compressed</span>
+<span class="sd">    :param bam_output: str, name of the bam to be produced</span>
+<span class="sd">    :param ref_fname: str, reference filename, used to produce bam_input</span>
+<span class="sd">    :param fast5_dir: str, root directory to find the fast5 files</span>
+<span class="sd">    :param summary: str, filename of a summary name, with the columns</span>
+<span class="sd">        to link the read id to the fast5 file containing it. Must contain</span>
+<span class="sd">        columns &#39;read_id&#39; and &#39;filename&#39;</span>
+<span class="sd">    :param regions: list, genomic regions to be extracted</span>
+<span class="sd">    :param threads: int, number of workers to be used</span>
+
+<span class="sd">    :returns: None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">regions</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_bam_regions</span><span class="p">(</span><span class="n">bam_input</span><span class="p">,</span> <span class="n">regions</span><span class="p">)</span>
+    <span class="n">ref_fasta</span> <span class="o">=</span> <span class="n">pysam</span><span class="o">.</span><span class="n">FastaFile</span><span class="p">(</span><span class="n">ref_fname</span><span class="p">)</span>
+
+    <span class="c1"># If fast_dir is passed, create an index</span>
+    <span class="k">if</span> <span class="n">fast5_dir</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span> <span class="k">as</span> <span class="n">input_file</span><span class="p">:</span>
+            <span class="c1"># Summary files can be huge, avoid loading to memory</span>
+            <span class="n">col_names</span> <span class="o">=</span> <span class="n">input_file</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;#&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="n">col_filename</span> <span class="o">=</span> <span class="n">col_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;filename&#39;</span><span class="p">)</span>
+            <span class="n">col_readid</span> <span class="o">=</span> <span class="n">col_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;read_id&#39;</span><span class="p">)</span>
+
+            <span class="n">file_index</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="n">col_readid</span><span class="p">],</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="n">col_filename</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">input_file</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">file_index</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span><span class="n">bam_input</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">alignments_bam</span><span class="p">:</span>
+        <span class="n">tmp_output</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.tmp&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">bam_output</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span>
+                <span class="n">tmp_output</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="n">alignments_bam</span><span class="o">.</span><span class="n">header</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                <span class="n">bam_current</span> <span class="o">=</span> <span class="n">alignments_bam</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span>
+                    <span class="n">reference</span><span class="o">=</span><span class="n">region</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span>
+                    <span class="n">start</span><span class="o">=</span><span class="n">region</span><span class="o">.</span><span class="n">start</span><span class="p">,</span>
+                    <span class="n">end</span><span class="o">=</span><span class="n">region</span><span class="o">.</span><span class="n">end</span><span class="p">)</span>
+                <span class="n">ref_sequence</span> <span class="o">=</span> <span class="n">ref_fasta</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="n">region</span><span class="o">.</span><span class="n">ref_name</span><span class="p">)</span>
+                <span class="n">ref_rle</span> <span class="o">=</span> <span class="n">RLEConverter</span><span class="p">(</span><span class="n">ref_sequence</span><span class="p">)</span>
+                <span class="n">func</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
+                    <span class="n">_compress_alignment</span><span class="p">,</span>
+                    <span class="n">ref_rle</span><span class="o">=</span><span class="n">ref_rle</span><span class="p">,</span>
+                    <span class="n">fast5_dir</span><span class="o">=</span><span class="n">fast5_dir</span><span class="p">,</span>
+                    <span class="n">file_index</span><span class="o">=</span><span class="n">file_index</span><span class="p">)</span>
+                <span class="k">with</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">ThreadPoolExecutor</span><span class="p">(</span>
+                        <span class="n">max_workers</span><span class="o">=</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">grouper</span><span class="p">(</span><span class="n">bam_current</span><span class="p">,</span> <span class="mi">100</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">new_alignment</span> <span class="ow">in</span> <span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">chunk</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="n">new_alignment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                                <span class="n">output</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">new_alignment</span><span class="p">)</span>
+
+        <span class="n">pysam</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="n">bam_output</span><span class="p">,</span> <span class="n">tmp_output</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">tmp_output</span><span class="p">)</span>
+        <span class="n">pysam</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">bam_output</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="compress_seq"><a class="viewcode-back" href="../../medaka.html#medaka.rle.compress_seq">[docs]</a><span class="k">def</span> <span class="nf">compress_seq</span><span class="p">(</span><span class="n">read</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compress homopolymers within a basecall.</span>
+
+<span class="sd">    Creates and RLE sequence record, with run-lengths stored in qualities.</span>
+
+<span class="sd">    :param read: `pysam FastxRecord` object.</span>
+
+<span class="sd">    :returns: `pysam FastxRecord`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;Compress_basecalls&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Phred qscores `!&quot;#$%&amp;`...</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">chr</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">33</span><span class="p">,</span> <span class="mi">127</span><span class="p">))</span>
+
+    <span class="n">rle_compressed</span> <span class="o">=</span> <span class="n">RLEConverter</span><span class="p">(</span><span class="n">read</span><span class="o">.</span><span class="n">sequence</span><span class="p">)</span>
+
+    <span class="c1"># we can only encode up to a homopolymer length 93</span>
+    <span class="n">inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">rle_compressed</span><span class="o">.</span><span class="n">homop_length</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">scores</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">inds</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Some homopolymers in </span><span class="si">{}</span><span class="s2"> are longer than the longest &quot;</span>
+            <span class="s2">&quot;supported length</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">read</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+        <span class="n">rle_compressed</span><span class="o">.</span><span class="n">homop_length</span><span class="p">[</span><span class="n">inds</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="n">coded_lengths</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">scores</span><span class="p">[</span><span class="n">x</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">rle_compressed</span><span class="o">.</span><span class="n">homop_length</span><span class="p">])</span>
+
+    <span class="n">compressed_record</span> <span class="o">=</span> <span class="n">pysam</span><span class="o">.</span><span class="n">FastxRecord</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">read</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">comment</span><span class="o">=</span><span class="n">read</span><span class="o">.</span><span class="n">comment</span> <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">comment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">,</span>
+        <span class="n">sequence</span><span class="o">=</span><span class="n">rle_compressed</span><span class="o">.</span><span class="n">compact_basecall</span><span class="p">,</span>
+        <span class="n">quality</span><span class="o">=</span><span class="n">coded_lengths</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">compressed_record</span></div>
+
+
+<div class="viewcode-block" id="compress_bam"><a class="viewcode-back" href="../../medaka.html#medaka.rle.compress_bam">[docs]</a><span class="k">def</span> <span class="nf">compress_bam</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compress a bam alignment file into an RLE system of reference.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">use_fast5_info</span><span class="p">:</span>
+        <span class="n">fast5_dir</span><span class="p">,</span> <span class="n">summary</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">use_fast5_info</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">fast5_dir</span> <span class="o">=</span> <span class="n">summary</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">_compress_bam</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">bam_input</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">bam_output</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">ref_fname</span><span class="p">,</span>
+        <span class="n">fast5_dir</span><span class="o">=</span><span class="n">fast5_dir</span><span class="p">,</span> <span class="n">summary</span><span class="o">=</span><span class="n">summary</span><span class="p">,</span>
+        <span class="n">threads</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">,</span> <span class="n">regions</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">regions</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_rle_bam_hdf_worker</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Append RLE tags to a sam record.</span>
+
+<span class="sd">    :param data: a tuple: sam record, read_id, is_rev, fname.</span>
+
+<span class="sd">    :returns: new sam record. If RLE data could not be retrieved the input</span>
+<span class="sd">        is returned unchanged.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;BAMDecor&#39;</span><span class="p">)</span>
+    <span class="n">line</span><span class="p">,</span> <span class="n">read_id</span><span class="p">,</span> <span class="n">is_rev</span><span class="p">,</span> <span class="n">fname</span> <span class="o">=</span> <span class="n">data</span>
+    <span class="n">hdf_dset</span> <span class="o">=</span> <span class="s1">&#39;Analyses/</span><span class="si">{}</span><span class="s1">/BaseCalled_template/RunlengthBasecall&#39;</span>
+    <span class="k">if</span> <span class="n">read_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">new_line</span> <span class="o">=</span> <span class="n">line</span>  <span class="c1"># parent passes header lines</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">get_fast5_file</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f5</span><span class="p">:</span>
+            <span class="c1"># this gives an error</span>
+            <span class="c1"># run_lengths = read.get_analysis_dataset(</span>
+            <span class="c1">#     latest, &#39;BaseCalled_template/RunlengthBasecall&#39;)</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="n">f5</span><span class="o">.</span><span class="n">get_read</span><span class="p">(</span><span class="n">read_id</span><span class="p">)</span>
+            <span class="n">latest</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">get_latest_analysis</span><span class="p">(</span><span class="s1">&#39;Basecall_1D&#39;</span><span class="p">)</span>
+            <span class="n">dset</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">handle</span><span class="p">[</span><span class="n">hdf_dset</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">latest</span><span class="p">)]</span>
+            <span class="n">bases</span> <span class="o">=</span> <span class="n">dset</span><span class="p">[</span><span class="s1">&#39;base&#39;</span><span class="p">][()]</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">x</span> <span class="o">==</span> <span class="n">y</span> <span class="k">for</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">bases</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">bases</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Invalid RLE/basecall dataset for </span><span class="si">{}</span><span class="s2"> in file </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">read_id</span><span class="p">,</span> <span class="n">fname</span><span class="p">))</span>
+                <span class="n">new_line</span> <span class="o">=</span> <span class="n">line</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">w_scale</span> <span class="o">=</span> <span class="n">dset</span><span class="p">[</span><span class="s1">&#39;scale&#39;</span><span class="p">]</span>  <span class="c1"># wl</span>
+                <span class="n">w_shape</span> <span class="o">=</span> <span class="n">dset</span><span class="p">[</span><span class="s1">&#39;shape&#39;</span><span class="p">]</span>  <span class="c1"># wk</span>
+                <span class="c1"># reverse tags if necessary:</span>
+                <span class="k">if</span> <span class="n">is_rev</span><span class="p">:</span>
+                    <span class="n">w_scale</span> <span class="o">=</span> <span class="n">w_scale</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">w_shape</span> <span class="o">=</span> <span class="n">w_shape</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">new_line</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="se">\t</span><span class="si">{}</span><span class="se">\t</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">line</span><span class="p">,</span>
+                    <span class="s1">&#39;WL:B:f,</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">w_scale</span><span class="p">)),</span>
+                    <span class="s1">&#39;WK:B:f,</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">w_shape</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">new_line</span>
+
+
+<div class="viewcode-block" id="rlebam"><a class="viewcode-back" href="../../medaka.html#medaka.rle.rlebam">[docs]</a><span class="k">def</span> <span class="nf">rlebam</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Entry point for merging run length information for fast5s to bam.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;BAMDecor&#39;</span><span class="p">)</span>
+    <span class="n">read_index</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">read_key_value_tsv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">read_index</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Found </span><span class="si">{}</span><span class="s2"> read in index</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">read_index</span><span class="p">)))</span>
+
+    <span class="k">def</span> <span class="nf">_ingress</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;@&#39;</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(),</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">read_id</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="n">is_rev</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">flag</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">16</span><span class="p">)</span>
+                <span class="n">fname</span> <span class="o">=</span> <span class="n">read_index</span><span class="p">[</span><span class="n">read_id</span><span class="p">]</span>
+                <span class="k">yield</span> <span class="n">line</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(),</span> <span class="n">read_id</span><span class="p">,</span> <span class="n">is_rev</span><span class="p">,</span> <span class="n">fname</span>
+
+    <span class="k">with</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">ProcessPoolExecutor</span><span class="p">(</span>
+            <span class="n">max_workers</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">workers</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                <span class="n">_rle_bam_hdf_worker</span><span class="p">,</span> <span class="n">_ingress</span><span class="p">(),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">results</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

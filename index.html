@@ -1,0 +1,321 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Medaka &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting Started" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Medaka</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="medaka">
+<h1>Medaka<a class="headerlink" href="#medaka" title="Permalink to this headline">¶</a></h1>
+<p>© 2018- Oxford Nanopore Technologies Ltd.</p>
+<p><code class="docutils literal notranslate"><span class="pre">medaka</span></code> is a tool to create consensus sequences and variant calls from
+nanopore sequencing data.  This task is performed using neural networks applied
+a pileup of individual sequencing reads against a draft assembly. It
+outperforms graph-based methods operating on basecalled data, and can be
+competitive with state-of-the-art signal-based methods whilst being much
+faster.</p>
+<p>As input <code class="docutils literal notranslate"><span class="pre">medaka</span></code> accepts reads in either a <code class="docutils literal notranslate"><span class="pre">.fasta</span></code> or a <code class="docutils literal notranslate"><span class="pre">.fastq</span></code> file. It
+requires a draft assembly as a <code class="docutils literal notranslate"><span class="pre">.fasta</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">medaka</span></code> is distributed under the terms of the Mozilla Public License 2.0.</p>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><ul class="simple">
+<li><p>Requires only basecalled data (<code class="docutils literal notranslate"><span class="pre">.fasta</span></code> or <code class="docutils literal notranslate"><span class="pre">.fastq</span></code>).</p></li>
+<li><p>Improved accurary over graph-based methods (e.g. Racon).</p></li>
+<li><p>Methylation aggregation from Guppy <code class="docutils literal notranslate"><span class="pre">.fast5</span></code> files.</p></li>
+<li><p>50X faster than Nanopolish (and can run on GPUs)..</p></li>
+<li><p>Benchmarks are provided (see <a class="reference internal" href="benchmarks.html"><span class="doc">Benchmarks</span></a>).</p></li>
+<li><p>Includes extras for implementing and training bespoke correction
+networks.</p></li>
+<li><p>Works on Linux (MacOS and Windows support is untested).</p></li>
+<li><p>Open source (Mozilla Public License 2.0).</p></li>
+</ul>
+</div></blockquote>
+<p>Tools to enable the creation of draft assembies can be found in a sister
+project <a class="reference external" href="https://github.com/nanoporetech/pomoxis">pomoxis</a>.</p>
+<div class="admonition-research-release admonition">
+<p class="admonition-title">Research Release</p>
+<p>Research releases are provided as technology demonstrators to provide early
+access to features or stimulate Community development of tools. Support for
+this software will be minimal and is only provided directly by the developers.
+Feature requests, improvements, and discussions are welcome and can be
+implemented by forking and pull requests. However much as we would
+like to rectify every issue and piece of feedback users may have, the
+developers may have limited resource for support of this software. Research
+releases may be unstable and subject to rapid iteration by Oxford Nanopore
+Technologies.</p>
+</div>
+<div class="section" id="acknowledgements">
+<h3>Acknowledgements<a class="headerlink" href="#acknowledgements" title="Permalink to this headline">¶</a></h3>
+<p>We thank <a class="reference external" href="https://github.com/jopineda">Joanna Pineda</a> and
+<a class="reference external" href="https://github.com/jts">Jared Simpson</a> for providing htslib code samples
+which aided greatly development of the optimised feature generation code,
+and for testing the version 0.4 release candidates.</p>
+<p>We thank <a class="reference external" href="https://github.com/devindrown">Devin Drown</a> for
+<a class="reference external" href="https://github.com/nanoporetech/medaka/issues/70">working through</a>
+use of <code class="docutils literal notranslate"><span class="pre">medaka</span></code> with his RTX 2080 GPU.</p>
+</div>
+</div>
+<div class="section" id="table-of-contents">
+<h2>Table of contents<a class="headerlink" href="#table-of-contents" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installation-methods">Installation Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#sequence-correction">Sequence correction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#human-variant-calling">Human variant calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#bacterial-ploidy-1-variant-calling">Bacterial (ploidy-1) variant calling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#comparison-of-medaka-and-nanopolish">Comparison of <cite>medaka</cite> and <cite>nanopolish</cite></a></li>
+<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#evaluation-across-samples-and-depths">Evaluation across samples and depths</a></li>
+<li class="toctree-l2"><a class="reference internal" href="benchmarks.html#complex-organism-genome-assembly">Complex organism genome assembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="snp.html">Human Variant Calling Benchmarks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="snp.html#snp-and-indel-calling">SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snp.html#r10-3-snp-and-indel-calling">R10.3 SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snp.html#guppy-3-6-snp-and-indel-calling">Guppy 3.6 SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snp.html#performing-variant-calling">Performing Variant Calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snp.html#further-improvements">Further Improvements</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="walkthrough.html">Walkthrough</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#obtaining-data-and-software">Obtaining Data and Software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#creating-a-draft-assembly">Creating a Draft Assembly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#polishing-a-consensus">Polishing a Consensus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#training-a-consensus-network">Training a Consensus Network</a></li>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#training-with-multipe-data-types">Training with multipe data types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="walkthrough.html#automated-training-pipeline">Automated training pipeline</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="draft_origin.html">Origin of the draft sequence</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="draft_origin.html#medaka-s-algorithm">Medaka’s Algorithm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="draft_origin.html#how-should-i-create-my-draft-sequence">How should I create my draft sequence?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="development.html#api-reference">API reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="future.html">History and Future Directions</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="installation.html" class="btn btn-neutral float-right" title="Getting Started" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

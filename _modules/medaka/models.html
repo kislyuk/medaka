@@ -1,0 +1,404 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.models &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.models</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.models</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Creation and loading of models.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+<span class="kn">import</span> <span class="nn">medaka.datastore</span>
+<span class="kn">import</span> <span class="nn">medaka.options</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ModelLoad&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DownloadError"><a class="viewcode-back" href="../../medaka.html#medaka.models.DownloadError">[docs]</a><span class="k">class</span> <span class="nc">DownloadError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Raised when model is unsuccessfully downloaded.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="resolve_model"><a class="viewcode-back" href="../../medaka.html#medaka.models.resolve_model">[docs]</a><span class="k">def</span> <span class="nf">resolve_model</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Resolve a model filepath, downloading known models if necessary.</span>
+
+<span class="sd">    :param model_name: str, model filepath or model ID</span>
+
+<span class="sd">    :returns: str: filepath to hdf model file or TF model directory.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">suffixes</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;_model.hdf5&quot;</span><span class="p">,</span> <span class="s2">&quot;_model.tar.gz&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>  <span class="c1"># model is path to model file</span>
+        <span class="k">return</span> <span class="n">model</span>
+    <span class="k">elif</span> <span class="n">model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">allowed_models</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Model </span><span class="si">{}</span><span class="s2"> is not a known model or existant file.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># check for model in model stores</span>
+        <span class="k">for</span> <span class="n">suffix</span> <span class="ow">in</span> <span class="n">suffixes</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">suffix</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">ms</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">model_stores</span><span class="p">:</span>
+                <span class="n">fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">fp</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">fp</span>
+
+        <span class="c1"># try to download model</span>
+        <span class="n">download_errors</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">suffix</span> <span class="ow">in</span> <span class="n">suffixes</span><span class="p">:</span>
+            <span class="n">fname</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">suffix</span><span class="p">)</span>
+            <span class="n">url</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">model_url_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">pkg</span><span class="o">=</span><span class="n">__package__</span><span class="p">,</span> <span class="n">subdir</span><span class="o">=</span><span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">model_subdir</span><span class="p">,</span>
+                <span class="n">fname</span><span class="o">=</span><span class="n">fname</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">content</span>
+                <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
+                    <span class="c1"># write the data and check it looks like a model</span>
+                    <span class="n">tmp_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;tmp</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">suffix</span><span class="p">))</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmp_file</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">tmp_model</span><span class="p">:</span>
+                        <span class="n">tmp_model</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="c1"># this will call ourself recursively, but we give a</span>
+                    <span class="c1"># filepath now so will return immediately.</span>
+                    <span class="k">with</span> <span class="n">open_model</span><span class="p">(</span><span class="n">tmp_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">model_store</span><span class="p">:</span>
+                        <span class="n">model_store</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="s1">&#39;model_function&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">download_errors</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">if</span> <span class="n">download_errors</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">suffixes</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">DownloadError</span><span class="p">(</span>
+                <span class="s2">&quot;The model file for </span><span class="si">{}</span><span class="s2"> is not already installed and &quot;</span>
+                <span class="s2">&quot;could not be downloaded. Check you are connected to &quot;</span>
+                <span class="s2">&quot;the internet and try again.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># save the model, try all locations</span>
+            <span class="k">for</span> <span class="n">ms</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">model_stores</span><span class="p">:</span>
+                <span class="n">fp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ms</span><span class="p">,</span> <span class="n">fname</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">d</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+                    <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                        <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">fp</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># we might not have write access</span>
+                    <span class="k">pass</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;The model file for </span><span class="si">{}</span><span class="s2"> is not installed and could not be &quot;</span>
+                <span class="s2">&quot;installed to any of </span><span class="si">{}</span><span class="s2">. If you cannot gain write &quot;</span>
+                <span class="s2">&quot;permissions, download the model file manually from </span><span class="si">{}</span><span class="s2"> and &quot;</span>
+                <span class="s2">&quot;use the downloaded model as the --model option.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">model</span><span class="p">,</span> <span class="s1">&#39; or &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">medaka</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">model_stores</span><span class="p">),</span> <span class="n">url</span><span class="p">))</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Model resolution failed&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="open_model"><a class="viewcode-back" href="../../medaka.html#medaka.models.open_model">[docs]</a><span class="k">def</span> <span class="nf">open_model</span><span class="p">(</span><span class="n">fname</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Determine model type from model name.</span>
+
+<span class="sd">    :param fname: model filepath</span>
+
+<span class="sd">    : returns: model store object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fname</span> <span class="o">=</span> <span class="n">resolve_model</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+    <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">fname</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">ext</span> <span class="o">==</span> <span class="s2">&quot;.hdf5&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">medaka</span><span class="o">.</span><span class="n">datastore</span><span class="o">.</span><span class="n">ModelStore</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ext</span> <span class="o">==</span> <span class="s2">&quot;.gz&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">medaka</span><span class="o">.</span><span class="n">datastore</span><span class="o">.</span><span class="n">ModelStoreTF</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Model </span><span class="si">{}</span><span class="s2"> does not have .hdf5 or .gz extension.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="build_model"><a class="viewcode-back" href="../../medaka.html#medaka.models.build_model">[docs]</a><span class="k">def</span> <span class="nf">build_model</span><span class="p">(</span><span class="n">feature_len</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">,</span> <span class="n">gru_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+                <span class="n">classify_activation</span><span class="o">=</span><span class="s1">&#39;softmax&#39;</span><span class="p">,</span> <span class="n">time_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Build a bidirectional GRU model with CuDNNGRU support.</span>
+
+<span class="sd">    CuDNNGRU implementation is claimed to give speed-up on GPU of 7x.</span>
+<span class="sd">    The function will build a model capable of running on GPU with</span>
+<span class="sd">    CuDNNGRU provided a) a GPU is present, b) the arguments to the</span>
+<span class="sd">    keras layer meet the CuDNN kernal requirements for cudnn = True;</span>
+<span class="sd">    otherwise a compatible (but not CuDNNGRU accelerated model) is built.</span>
+
+<span class="sd">    :param feature_len: int, number of features for each pileup column.</span>
+<span class="sd">    :param num_classes: int, number of output class labels.</span>
+<span class="sd">    :param gru_size: int, size of each GRU layer.</span>
+<span class="sd">    :param classify_activation: str, activation to use in classification layer.</span>
+<span class="sd">    :param time_steps: int, number of pileup columns in a sample.</span>
+
+<span class="sd">    :returns: `keras.models.Sequential` object.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+    <span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">Sequential</span>
+    <span class="kn">from</span> <span class="nn">tensorflow.keras.layers</span> <span class="kn">import</span> <span class="n">Dense</span><span class="p">,</span> <span class="n">GRU</span><span class="p">,</span> <span class="n">Bidirectional</span>
+
+    <span class="c1">#  Tensorflow2 uses a fast cuDNN implementation if a GPU is available</span>
+    <span class="c1">#  and the arguments to the layer meet the CuDNN kernal requirements</span>
+    <span class="k">if</span> <span class="n">tf</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">list_physical_devices</span><span class="p">(</span><span class="s1">&#39;GPU&#39;</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;GPU available: building model with cudnn optimization&quot;</span><span class="p">)</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Sequential</span><span class="p">()</span>
+    <span class="n">input_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">time_steps</span><span class="p">,</span> <span class="n">feature_len</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;gru</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">gru</span> <span class="o">=</span> <span class="n">GRU</span><span class="p">(</span>
+            <span class="n">gru_size</span><span class="p">,</span> <span class="n">reset_after</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">recurrent_activation</span><span class="o">=</span><span class="s1">&#39;sigmoid&#39;</span><span class="p">,</span>
+            <span class="n">return_sequences</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Bidirectional</span><span class="p">(</span><span class="n">gru</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="n">input_shape</span><span class="p">))</span>
+
+    <span class="c1"># see keras #10417 for why we specify input shape</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Dense</span><span class="p">(</span>
+        <span class="n">num_classes</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">classify_activation</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;classify&#39;</span><span class="p">,</span>
+        <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="n">time_steps</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">gru_size</span><span class="p">)</span>
+    <span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="build_majority"><a class="viewcode-back" href="../../medaka.html#medaka.models.build_majority">[docs]</a><span class="k">def</span> <span class="nf">build_majority</span><span class="p">(</span><span class="n">feature_len</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">,</span> <span class="n">gru_size</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+                   <span class="n">classify_activation</span><span class="o">=</span><span class="s1">&#39;softmax&#39;</span><span class="p">,</span> <span class="n">time_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Build a mock model that simply sums counts.</span>
+
+<span class="sd">    :param feature_len: int, number of features for each pileup column.</span>
+<span class="sd">    :param num_classes: int, number of output class labels.</span>
+<span class="sd">    :param gru_size: int, size of each GRU layer.</span>
+<span class="sd">    :param classify_activation: str, activation to use in classification layer.</span>
+<span class="sd">    :param time_steps: int, number of pileup columns in a sample.</span>
+
+<span class="sd">    :returns: `keras.models.Sequential` object.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+    <span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">Sequential</span>
+    <span class="kn">from</span> <span class="nn">tensorflow.keras.layers</span> <span class="kn">import</span> <span class="n">Lambda</span><span class="p">,</span> <span class="n">Activation</span>
+
+    <span class="k">def</span> <span class="nf">sum_counts</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Sum forward and reverse counts.&quot;&quot;&quot;</span>
+        <span class="c1"># TODO write to handle multiple dtypes</span>
+        <span class="c1"># acgtACGTdD</span>
+        <span class="c1"># sum base counts</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">f</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">+</span> <span class="n">f</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">4</span><span class="p">:</span><span class="mi">8</span><span class="p">]</span>
+        <span class="c1"># sum deletion counts (indexing in this way retains correct shape)</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">f</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">8</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">+</span> <span class="n">f</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">9</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">tf</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">d</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">Sequential</span><span class="p">()</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Lambda</span><span class="p">(</span><span class="n">sum_counts</span><span class="p">,</span> <span class="n">output_shape</span><span class="o">=</span><span class="p">(</span><span class="n">time_steps</span><span class="p">,</span> <span class="n">num_classes</span><span class="p">)))</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Activation</span><span class="p">(</span><span class="s1">&#39;softmax&#39;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">model</span></div>
+
+
+<span class="n">default_model</span> <span class="o">=</span> <span class="s1">&#39;two_layer_bidirectional_CuDNNGRU&#39;</span>
+<span class="n">model_builders</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;two_layer_bidirectional_CuDNNGRU&#39;</span><span class="p">:</span> <span class="n">build_model</span><span class="p">,</span>
+    <span class="s1">&#39;majority_vote&#39;</span><span class="p">:</span> <span class="n">build_majority</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

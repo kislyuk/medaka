@@ -1,0 +1,712 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.datastore &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.datastore</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.datastore</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Storing of training and inference data to file.&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> \
+    <span class="n">as_completed</span><span class="p">,</span> <span class="n">ProcessPoolExecutor</span><span class="p">,</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+
+
+<span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">FutureWarning</span><span class="p">)</span>
+    <span class="kn">import</span> <span class="nn">h5py</span>
+
+
+<div class="viewcode-block" id="BaseModelStore"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.BaseModelStore">[docs]</a><span class="k">class</span> <span class="nc">BaseModelStore</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Base class for model store classes.&quot;&quot;&quot;</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize feature encoder.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<div class="viewcode-block" id="BaseModelStore.load_model"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.BaseModelStore.load_model">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">load_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_steps</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load a model from hdf file/tensorflow directory.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+<div class="viewcode-block" id="BaseModelStore.get_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.BaseModelStore.get_meta">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a meta data item.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+<div class="viewcode-block" id="BaseModelStore.copy_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.BaseModelStore.copy_meta">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">copy_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Copy meta data to hdf.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div></div>
+
+
+<div class="viewcode-block" id="ModelStore"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStore">[docs]</a><span class="k">class</span> <span class="nc">ModelStore</span><span class="p">(</span><span class="n">BaseModelStore</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Read and write model and meta to a hdf file.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize a Modelstore.</span>
+
+<span class="sd">        :param filename: filepath to hdf file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ModelStore&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create context for handling a modelstore file.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exception_type</span><span class="p">,</span> <span class="n">exception_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Exit context manager.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">exception_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;ModelStore exception </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">exception_type</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ModelStore.load_model"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStore.load_model">[docs]</a>    <span class="k">def</span> <span class="nf">load_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load a model from an .hdf file.</span>
+
+<span class="sd">        :param time_steps: number of time points in RNN, `None` for dynamic.</span>
+
+<span class="sd">        ..note:: keras&#39; `load_model` cannot handle CuDNNGRU layers, hence this</span>
+<span class="sd">            function builds the model then loads the weights.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;filepath </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">))</span>
+            <span class="n">model_partial_function</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="s1">&#39;model_function&#39;</span><span class="p">)</span>
+            <span class="n">model</span> <span class="o">=</span> <span class="n">model_partial_function</span><span class="p">(</span><span class="n">time_steps</span><span class="o">=</span><span class="n">time_steps</span><span class="p">)</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">load_weights</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">model</span></div>
+
+<div class="viewcode-block" id="ModelStore.get_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStore.get_meta">[docs]</a>    <span class="k">def</span> <span class="nf">get_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a meta data item.</span>
+
+<span class="sd">        :param key: name of item to load.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ds</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="n">key</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ModelStore.copy_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStore.copy_meta">[docs]</a>    <span class="k">def</span> <span class="nf">copy_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Copy meta data to hdf.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ds</span><span class="o">.</span><span class="n">copy_meta</span><span class="p">(</span><span class="n">other</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="ModelStoreTF"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF">[docs]</a><span class="k">class</span> <span class="nc">ModelStoreTF</span><span class="p">(</span><span class="n">BaseModelStore</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Read and write model to tensorflow storage directory.&quot;&quot;&quot;</span>
+
+    <span class="n">top_level_dir</span> <span class="o">=</span> <span class="s1">&#39;model&#39;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize a Modelstore.</span>
+
+<span class="sd">        :param filename: filepath to saved_model directory</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;ModelStoreTF&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="ModelStoreTF.unpack"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF.unpack">[docs]</a>    <span class="k">def</span> <span class="nf">unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Unpack model files from archive.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># tmpdir is removed by .cleanup()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span>
+            <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span> <span class="k">as</span> <span class="n">tar</span><span class="p">:</span>
+                <span class="n">tar</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">meta_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">top_level_dir</span><span class="p">,</span> <span class="s1">&#39;meta.pkl&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">meta_file</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fh</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+<div class="viewcode-block" id="ModelStoreTF.cleanup"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF.cleanup">[docs]</a>    <span class="k">def</span> <span class="nf">cleanup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Clean up temporary files.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Context manager.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unpack</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exception_type</span><span class="p">,</span> <span class="n">exception_value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Remove temporary unpack_filepath.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">exception_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;ModelStoreTF exception </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">exception_type</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Run cleanup on destroy.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cleanup</span><span class="p">()</span>
+
+<div class="viewcode-block" id="ModelStoreTF.load_model"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF.load_model">[docs]</a>    <span class="k">def</span> <span class="nf">load_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load a model from a tf saved_model file.</span>
+
+<span class="sd">        :param time_steps: number of time points in RNN, `None` for dynamic.</span>
+
+<span class="sd">        ..note:: this function builds the model then loads the weights.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unpack</span><span class="p">()</span>
+        <span class="n">model_partial_function</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="s1">&#39;model_function&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model_partial_function</span><span class="p">(</span><span class="n">time_steps</span><span class="o">=</span><span class="n">time_steps</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">top_level_dir</span><span class="p">,</span> <span class="s1">&#39;variables&#39;</span><span class="p">,</span> <span class="s1">&#39;variables&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;loading weights from </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">weights</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">load_weights</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span></div>
+
+<div class="viewcode-block" id="ModelStoreTF.get_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF.get_meta">[docs]</a>    <span class="k">def</span> <span class="nf">get_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load (deserialise) a meta data item.</span>
+
+<span class="sd">        :param key: name of item to load.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unpack</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="n">key</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="ModelStoreTF.copy_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.ModelStoreTF.copy_meta">[docs]</a>    <span class="k">def</span> <span class="nf">copy_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hdf</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Copy metadata to hdf file.</span>
+
+<span class="sd">        :param hdf: filename of hdf file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unpack</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="n">hdf</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">ds</span><span class="o">.</span><span class="n">set_meta</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="DataStore"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore">[docs]</a><span class="k">class</span> <span class="nc">DataStore</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Read and write data to .hdf files.&quot;&quot;&quot;</span>
+
+    <span class="n">_meta_group_</span> <span class="o">=</span> <span class="s1">&#39;meta&#39;</span>  <span class="c1"># top level group for meta items</span>
+    <span class="n">_sample_path_</span> <span class="o">=</span> <span class="s1">&#39;samples/data&#39;</span>  <span class="c1"># data group contains sample Datasets</span>
+    <span class="n">_sample_registry_path_</span> <span class="o">=</span> <span class="s1">&#39;samples/registry&#39;</span>  <span class="c1"># set of sample keys</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize a datastore.</span>
+
+<span class="sd">        :param filename: file to open.</span>
+<span class="sd">        :param mode: file opening mode (&#39;r&#39;, &#39;w&#39;, &#39;a&#39;).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;DataStore&#39;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write_executor</span> <span class="o">=</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write_futures</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fh</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create context for handling a datastore file.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Shutdown sample writer and close.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">!=</span> <span class="s1">&#39;r&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write_executor</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write_sample_registry</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+<div class="viewcode-block" id="DataStore.close"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.close">[docs]</a>    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Close filehandle of back-end file.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="DataStore.get_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.get_meta">[docs]</a>    <span class="k">def</span> <span class="nf">get_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load (deserialise) a meta data item.</span>
+
+<span class="sd">        :param key: name of item to load.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_meta_group_</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">path</span><span class="p">][()])</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Could not load </span><span class="si">{}</span><span class="s2"> from </span><span class="si">{}</span><span class="s2">. </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="DataStore.set_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.set_meta">[docs]</a>    <span class="k">def</span> <span class="nf">set_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Store (serialize) a meta data item to file.</span>
+
+<span class="sd">        :param obj: the object to serialise.</span>
+<span class="sd">        :param key: the name of the object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_meta_group_</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
+        <span class="n">pickled_obj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">string_</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickled_obj</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="DataStore.copy_meta"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.copy_meta">[docs]</a>    <span class="k">def</span> <span class="nf">copy_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Copy metadata to another file.</span>
+
+<span class="sd">        :param other: filename of another file.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">other_ds</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_meta_group_</span><span class="p">,</span> <span class="n">other_ds</span><span class="o">.</span><span class="n">fh</span><span class="p">,</span>
+                <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_meta_group_</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sample_registry</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a set of samples stored within file.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_initialise_sample_registry</span><span class="p">()</span>  <span class="c1"># is idempotent</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">n_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the number of samples stored in file.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_registry</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DataStore.write_sample"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.write_sample">[docs]</a>    <span class="k">def</span> <span class="nf">write_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write sample to hdf.</span>
+
+<span class="sd">        Checks are performed to ensure a sample is not written twice and</span>
+<span class="sd">        a count of unique training labels seen is maintained.</span>
+
+<span class="sd">        :param sample: `medaka.common.Sample` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">contains_numpy_array</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">field</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">sample</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">contains_numpy_array</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Not writing sample as it has no data.&#39;</span><span class="p">)</span>
+
+        <span class="c1"># if the sample does not already exist (according to sample registry)</span>
+        <span class="k">elif</span> <span class="n">sample</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_registry</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">sample</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                <span class="c1"># do not write None</span>
+                <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+                    <span class="c1"># handle numpy array of unicode chars</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> \
+                            <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">unicode</span><span class="p">):</span>
+                        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">char</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="n">location</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_sample_path_</span><span class="p">,</span> <span class="n">sample</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">write_futures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">write_executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_write_dataset</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">data</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s1">&#39;Not writing </span><span class="si">{}</span><span class="s1"> as present already&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">sample</span><span class="o">.</span><span class="n">name</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="DataStore.load_sample"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataStore.load_sample">[docs]</a>    <span class="k">def</span> <span class="nf">load_sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load `medaka.common.Sample` object from file.</span>
+
+<span class="sd">        :param key: str, sample name.</span>
+<span class="sd">        :returns: `medaka.common.Sample` object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Sample</span><span class="o">.</span><span class="n">_fields</span><span class="p">}</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_path_</span><span class="p">,</span> <span class="n">key</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Sample</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">s</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="n">field</span><span class="p">][()]</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># handle loading of bytestrings</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">field</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">and</span> \
+                        <span class="nb">isinstance</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">field</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="nb">type</span><span class="p">(</span><span class="sa">b</span><span class="s1">&#39;&#39;</span><span class="p">)):</span>
+                    <span class="n">s</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">char</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="n">field</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Sample</span><span class="p">(</span><span class="o">**</span><span class="n">s</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_write_dataset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">location</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write data, compressing numpy arrays.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
+                                   <span class="n">compression</span><span class="o">=</span><span class="s1">&#39;gzip&#39;</span><span class="p">,</span>
+                                   <span class="n">compression_opts</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">location</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span>
+
+    <span class="k">def</span> <span class="nf">_write_pickled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write a pickled object to file.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">path</span><span class="p">]</span>
+        <span class="n">pickled_obj</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">string_</span><span class="p">(</span><span class="n">pickle</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">pickled_obj</span>
+
+    <span class="k">def</span> <span class="nf">_initialise_sample_registry</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Load sample registry from file if present else create.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry_path_</span><span class="p">][()])</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_write_sample_registry</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write sample registry.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing sample registry.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry_path_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry_path_</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_write_pickled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_registry</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_sample_registry_path_</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DataIndex"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataIndex">[docs]</a><span class="k">class</span> <span class="nc">DataIndex</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Index and serve samples from multiple `DataStore` compatible files.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filenames</span><span class="p">,</span> <span class="n">threads</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Intialize an index across a set of files.</span>
+
+<span class="sd">        :param filenames: list of files to index.</span>
+<span class="sd">        :param threads: number of threads to use for indexing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;DataIndex&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filenames</span> <span class="o">=</span> <span class="n">filenames</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">threads</span> <span class="o">=</span> <span class="n">threads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filenames</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_index</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extract_sample_registries</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_load_metadata</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_extract_sample_registries</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">with</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">threads</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="n">future_to_fn</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">DataIndex</span><span class="o">.</span><span class="n">_load_sample_registry</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span> <span class="n">fn</span>
+                <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filenames</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">future</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">as_completed</span><span class="p">(</span><span class="n">future_to_fn</span><span class="p">),</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">fn</span> <span class="o">=</span> <span class="n">future_to_fn</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">sample_registry</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                        <span class="p">[(</span><span class="n">s</span><span class="p">,</span> <span class="n">fn</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sample_registry</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;No sample_registry in </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fn</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s1">&#39;Loaded </span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1"> (</span><span class="si">{:.2f}</span><span class="s1">%) sample files.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="n">i</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_files</span><span class="p">,</span>
+                            <span class="n">i</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_files</span> <span class="o">*</span> <span class="mi">100</span><span class="p">))</span>
+        <span class="c1"># make order of samples independent of order in which tasks complete</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_load_sample_registry</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ds</span><span class="o">.</span><span class="n">sample_registry</span>
+
+    <span class="k">def</span> <span class="nf">_load_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return metadata for first file.</span>
+
+<span class="sd">        Assumes that metadata is identical for all feature files</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">first_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filenames</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">with</span> <span class="n">DataStore</span><span class="p">(</span><span class="n">first_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ds</span><span class="o">.</span><span class="n">_meta_group_</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">fh</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">fh</span><span class="p">[</span><span class="n">ds</span><span class="o">.</span><span class="n">_meta_group_</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                    <span class="n">metadata</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">metadata</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a dictionary describing all samples.</span>
+
+<span class="sd">        The dictionary maps sample names to their file and HDF group. It is</span>
+<span class="sd">        sorted by reference coordinate.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_sorted_index</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">regions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a Region object for each ref_name in the index.</span>
+
+<span class="sd">        Each region will have start and end set to None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Region</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">_get_sorted_index</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get index of samples indexed by reference and ordered by start pos.</span>
+
+<span class="sd">        :returns: {ref_name: [sample dicts sorted by start]}</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ref_names</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">sample_key</span><span class="p">,</span> <span class="n">fn</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Sample</span><span class="o">.</span><span class="n">decode_sample_name</span><span class="p">(</span><span class="n">sample_key</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">d</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">d</span><span class="p">[</span><span class="s1">&#39;sample_key&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample_key</span>
+                <span class="n">d</span><span class="p">[</span><span class="s1">&#39;filename&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fn</span>
+                <span class="n">ref_names</span><span class="p">[</span><span class="n">d</span><span class="p">[</span><span class="s1">&#39;ref_name&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+        <span class="c1"># sort dicts so that refs are in order and within a ref,</span>
+        <span class="c1"># chunks are in order</span>
+        <span class="n">ref_names_ordered</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+        <span class="c1"># sort by start and -end so that if we have two samples with the same</span>
+        <span class="c1"># start but different end points, the longest sample comes first</span>
+        <span class="k">def</span> <span class="nf">get_major_minor</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">tuple</span><span class="p">((</span><span class="nb">int</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)))</span>
+
+        <span class="k">def</span> <span class="nf">sorter</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">get_major_minor</span><span class="p">(</span>
+                <span class="n">x</span><span class="p">[</span><span class="s1">&#39;start&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">((</span><span class="o">-</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">get_major_minor</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="s1">&#39;end&#39;</span><span class="p">])))</span>
+
+        <span class="k">for</span> <span class="n">ref_name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ref_names</span><span class="p">):</span>
+            <span class="n">ref_names</span><span class="p">[</span><span class="n">ref_name</span><span class="p">]</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">sorter</span><span class="p">)</span>
+            <span class="n">ref_names_ordered</span><span class="p">[</span><span class="n">ref_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref_names</span><span class="p">[</span><span class="n">ref_name</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">ref_names_ordered</span>
+
+<div class="viewcode-block" id="DataIndex.yield_from_feature_files"><a class="viewcode-back" href="../../medaka.html#medaka.datastore.DataIndex.yield_from_feature_files">[docs]</a>    <span class="k">def</span> <span class="nf">yield_from_feature_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">regions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">samples</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Yield `medaka.common.Sample` objects from one or more feature files.</span>
+
+<span class="sd">        :regions: list of `medaka.common.Region` s for which to yield samples.</span>
+<span class="sd">        :samples: iterable of sample names to yield (in order in which they</span>
+<span class="sd">            are supplied).</span>
+
+<span class="sd">        :yields: `medaka.common.Sample` objects.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">samples</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">all_samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span>
+            <span class="k">if</span> <span class="n">regions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">regions</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Region</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">all_samples</span><span class="p">)]</span>
+            <span class="n">samples</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">reg</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">reg</span><span class="o">.</span><span class="n">ref_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="n">reg</span><span class="o">.</span><span class="n">ref_name</span><span class="p">]:</span>
+                    <span class="c1"># samples can have major.minor coords, round to end excl.</span>
+                    <span class="n">sam_reg</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">Region</span><span class="p">(</span>
+                        <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;ref_name&#39;</span><span class="p">],</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;start&#39;</span><span class="p">])),</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;end&#39;</span><span class="p">]))</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">sam_reg</span><span class="o">.</span><span class="n">overlaps</span><span class="p">(</span><span class="n">reg</span><span class="p">):</span>
+                        <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;sample_key&#39;</span><span class="p">],</span> <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;filename&#39;</span><span class="p">]))</span>
+        <span class="c1"># yield samples reusing filehandle where possible</span>
+        <span class="n">ds</span><span class="p">,</span> <span class="n">ds_fname</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">fname</span> <span class="o">!=</span> <span class="n">ds_fname</span><span class="p">:</span>
+                <span class="n">ds</span> <span class="o">=</span> <span class="n">DataStore</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+                <span class="n">ds_fname</span> <span class="o">=</span> <span class="n">fname</span>
+            <span class="k">yield</span> <span class="n">ds</span><span class="o">.</span><span class="n">load_sample</span><span class="p">(</span><span class="n">key</span><span class="p">)</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

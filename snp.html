@@ -1,0 +1,514 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Human Variant Calling Benchmarks &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Walkthrough" href="walkthrough.html" />
+    <link rel="prev" title="Benchmarks" href="benchmarks.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Human Variant Calling Benchmarks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#snp-and-indel-calling">SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#r10-3-snp-and-indel-calling">R10.3 SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#guppy-3-6-snp-and-indel-calling">Guppy 3.6 SNP and Indel calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#performing-variant-calling">Performing Variant Calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#further-improvements">Further Improvements</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Human Variant Calling Benchmarks</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/snp.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="human-variant-calling-benchmarks">
+<h1>Human Variant Calling Benchmarks<a class="headerlink" href="#human-variant-calling-benchmarks" title="Permalink to this headline">¶</a></h1>
+<p>Medaka implements a small variant calling pipeline to call single nucleotide
+polymorphisms (SNPs) together with insertions and deletions (Indels) from Nanopore
+basecalls. The pipeline leverages a diploid-aware neural network, read haplotype
+tagging via <a class="reference external" href="https://whatshap.readthedocs.io">WhatsHap</a>, and haplotype consensus
+using <code class="docutils literal notranslate"><span class="pre">medaka</span></code>’s usual consensus network.</p>
+<p>The following benchmarking is performed on chromosome 21 of the HG001 (NA12878) sample,
+according to <a class="reference external" href="https://www.nature.com/articles/s41587-019-0054-x">GA4GH best practices</a>
+using <a class="reference external" href="https://github.com/Illumina/hap.py">hap.py</a> with the
+<a class="reference external" href="http://jimb.stanford.edu/giab-resources/">GIAB truth set</a> stratified to exclude
+repeat regions as defined by the
+<a class="reference external" href="https://github.com/jzook/genome-data-integration/tree/master/NISTv3.3.2/filtbeds/GRCh38">GA4GH process</a>.
+Variants were filtered by their <code class="docutils literal notranslate"><span class="pre">QUAL</span></code> values (separately for SNP and Indel classes)
+to maximise the F1 score.</p>
+<div class="section" id="snp-and-indel-calling">
+<h2>SNP and Indel calling<a class="headerlink" href="#snp-and-indel-calling" title="Permalink to this headline">¶</a></h2>
+<p><em>Last updated December 2019</em></p>
+<p><code class="docutils literal notranslate"><span class="pre">Medaka</span></code>’s variant calling pipeline first aligns all reads to a reference sequence,
+creates a read pileup and uses a recurrent neural network to predict a pair of bases for
+every reference locus. The predictions are combined with the reference
+sequence to create candidate variants under an independence assumption between
+loci; no attempt is made at this point to combine predicted bases across reference
+loci. This approach alone gives a reasonable estimation of variants:</p>
+<table class="docutils align-default" id="id9">
+<caption><span class="caption-text">Single nucleotide polymorphism calling from the first stage of the
+ <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">variant</span></code> pipeline for chromosome 21 of the NA12878 sample.
+ Comparison is made with the <a class="reference external" href="http://jimb.stanford.edu/giab-resources/">GIAB</a>
+ high confidence callset using <a class="reference external" href="https://github.com/Illumina/hap.py">hap.py</a>.</span><a class="headerlink" href="#id9" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 22%" />
+<col style="width: 18%" />
+<col style="width: 20%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>Precision</p></td>
+<td><p>Recall</p></td>
+<td><p>F1 score</p></td>
+</tr>
+<tr class="row-even"><td><p>medaka first stage</p></td>
+<td><p>0.9929</p></td>
+<td><p>0.9392</p></td>
+<td><p>0.965</p></td>
+</tr>
+</tbody>
+</table>
+<p>Single nucleotide polymorphisms account for 85% of small variants in the human genome,
+leaving a good proportion of insertion and deletion variants. It is therefore
+desirable to be able to detect indel variants. To improve on the above results,
+<code class="docutils literal notranslate"><span class="pre">medaka</span></code>’s pipeline phases the recovered variants
+using <a class="reference external" href="https://whatshap.readthedocs.io">WhatsHap</a>. This process allows
+recovery of maternal and paternal haplotypes, and the assignment of each read to one of them. Having
+partitioned reads into their haplotype, <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span></code> is run
+independently for each haplotype to calculate haplotype specific consensus sequences.</p>
+<img alt="_images/phased_snps.png" src="_images/phased_snps.png" />
+<p>This second pass is a task in which we know <code class="docutils literal notranslate"><span class="pre">medaka</span></code> excels, see <a class="reference internal" href="benchmarks.html#benchmarks"><span class="std std-ref">Benchmarks</span></a>.
+From the multiple haplotype consensus sequences it is a simple task to reconstruct
+variant calls for both homo- and hetero-zygous sites.</p>
+<table class="docutils align-default" id="id10">
+<caption><span class="caption-text">Small variant calling at 100-fold coverage using <cite>medaka variant</cite> pipeline.
+Comparison is made with the <a class="reference external" href="http://jimb.stanford.edu/giab-resources/">GIAB</a>
+high confidence callset using <a class="reference external" href="https://github.com/Illumina/hap.py">hap.py</a>.</span><a class="headerlink" href="#id10" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 13%" />
+<col style="width: 20%" />
+<col style="width: 16%" />
+<col style="width: 18%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>Class</p></td>
+<td><p>Precision</p></td>
+<td><p>Recall</p></td>
+<td><p>F1 score</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>medaka variant</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9967</p></td>
+<td><p>0.9954</p></td>
+<td><p>0.996</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9558</p></td>
+<td><p>0.9174</p></td>
+<td><p>0.936</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>clair</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9931</p></td>
+<td><p>0.9950</p></td>
+<td><p>0.994</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9094</p></td>
+<td><p>0.8092</p></td>
+<td><p>0.856</p></td>
+</tr>
+<tr class="row-even"><td><p>nanopolish</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9938</p></td>
+<td><p>0.9662</p></td>
+<td><p>0.980</p></td>
+</tr>
+</tbody>
+</table>
+<p>Shown also are results from <a class="reference external" href="https://github.com/HKU-BAL/Clair">clair</a>,
+and older results for SNP calling from <code class="docutils literal notranslate"><span class="pre">nanopolish</span></code>. We note that Clair
+and medaka are competitive in terms of SNP calling but that medaka
+excels Clair for indel calling. In contrast to medaka’s haplotype-consensus
+approach, clair attempts to call indels directly from the read pileup;
+medaka’s factorisation of variant calling problem would appear to be more
+successful. This seems to be particularly true when comparing heterozygous
+indels to homozygous cases:</p>
+<table class="docutils align-default" id="id11">
+<caption><span class="caption-text">Indel calling comparison of medaka and clair. Within the test
+region there are approximately equal numbers of homozygous and
+heterozygous cases.</span><a class="headerlink" href="#id11" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 13%" />
+<col style="width: 20%" />
+<col style="width: 16%" />
+<col style="width: 18%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>Indel</p></td>
+<td><p>Precision</p></td>
+<td><p>Recall</p></td>
+<td><p>F1 score</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>medaka variant</p></td>
+<td><p>Hom</p></td>
+<td><p>0.9790</p></td>
+<td><p>0.9553</p></td>
+<td><p>0.967</p></td>
+</tr>
+<tr class="row-odd"><td><p>Het</p></td>
+<td><p>0.8995</p></td>
+<td><p>0.8738</p></td>
+<td><p>0.886</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>clair</p></td>
+<td><p>Hom</p></td>
+<td><p>0.9566</p></td>
+<td><p>0.9175</p></td>
+<td><p>0.937</p></td>
+</tr>
+<tr class="row-odd"><td><p>Het</p></td>
+<td><p>0.8707</p></td>
+<td><p>0.7332</p></td>
+<td><p>0.796</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="r10-3-snp-and-indel-calling">
+<h2>R10.3 SNP and Indel calling<a class="headerlink" href="#r10-3-snp-and-indel-calling" title="Permalink to this headline">¶</a></h2>
+<p><em>Last updated February 2020</em></p>
+<p>The benchmarks were performed as described above, but on chromosome 20 of
+the HG002 (NA24385) sample at 60-fold coverage.</p>
+<table class="docutils align-default" id="id12">
+<caption><span class="caption-text">Small variant calling at 60-fold coverage using <cite>medaka variant</cite> pipeline.
+Comparison is made with the <a class="reference external" href="http://jimb.stanford.edu/giab-resources/">GIAB</a>
+high confidence callset using <a class="reference external" href="https://github.com/Illumina/hap.py">hap.py</a>.</span><a class="headerlink" href="#id12" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 13%" />
+<col style="width: 20%" />
+<col style="width: 16%" />
+<col style="width: 18%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>Class</p></td>
+<td><p>Precision</p></td>
+<td><p>Recall</p></td>
+<td><p>F1 score</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>R9.4.1</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9898</p></td>
+<td><p>0.9931</p></td>
+<td><p>0.992</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9199</p></td>
+<td><p>0.8634</p></td>
+<td><p>0.891</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>R10.3</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9892</p></td>
+<td><p>0.9946</p></td>
+<td><p>0.992</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9508</p></td>
+<td><p>0.9385</p></td>
+<td><p>0.945</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="guppy-3-6-snp-and-indel-calling">
+<h2>Guppy 3.6 SNP and Indel calling<a class="headerlink" href="#guppy-3-6-snp-and-indel-calling" title="Permalink to this headline">¶</a></h2>
+<p><em>Last updated June 2020</em></p>
+<p>The benchmarks were performed as described above, but on chromosome 20 of
+the HG002 (NA24385) sample at 60-fold coverage.</p>
+<table class="docutils align-default" id="id13">
+<caption><span class="caption-text">R9.4.1 small variant calling at 60-fold coverage using <cite>medaka variant</cite> pipeline.
+Comparison is made with the <a class="reference external" href="http://jimb.stanford.edu/giab-resources/">GIAB</a>
+high confidence callset using <a class="reference external" href="https://github.com/Illumina/hap.py">hap.py</a>.</span><a class="headerlink" href="#id13" title="Permalink to this table">¶</a></caption>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 11%" />
+<col style="width: 18%" />
+<col style="width: 15%" />
+<col style="width: 16%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>medaka / variant model</p></td>
+<td><p>Class</p></td>
+<td><p>Precision</p></td>
+<td><p>Recall</p></td>
+<td><p>F1 score</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>v1.0.1 /
+r941_prom_variant_g322</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9898</p></td>
+<td><p>0.9931</p></td>
+<td><p>0.992</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9199</p></td>
+<td><p>0.8634</p></td>
+<td><p>0.891</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>v1.0.2 /
+r941_prom_variant_g360</p></td>
+<td><p>SNP</p></td>
+<td><p>0.9917</p></td>
+<td><p>0.9965</p></td>
+<td><p>0.994</p></td>
+</tr>
+<tr class="row-odd"><td><p>Indel</p></td>
+<td><p>0.9379</p></td>
+<td><p>0.8982</p></td>
+<td><p>0.918</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="performing-variant-calling">
+<h2>Performing Variant Calling<a class="headerlink" href="#performing-variant-calling" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">medaka_variant</span></code> (and <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code>) pipeline only operate on
+a <code class="docutils literal notranslate"><span class="pre">.bam</span></code> alignment file containing a single sample (value of the <cite>RG</cite>
+alignment tag). It will refuse to run in the case of two read groups
+being present.</p>
+</div>
+<p>The pipeline described above is implemented in the <code class="docutils literal notranslate"><span class="pre">medaka_variant</span></code> program:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>
+medaka_variant -f &lt;REFERENCE.fasta&gt; -b &lt;reads.bam&gt;
+</pre></div>
+</div>
+<p>This will run all steps of the process described above, finally outputting a
+phased <code class="docutils literal notranslate"><span class="pre">.vcf</span></code> variant file.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Variants output by <code class="docutils literal notranslate"><span class="pre">medaka_variant</span></code> are marked as “PASS” or “lowqual” in
+the <code class="docutils literal notranslate"><span class="pre">FILTER</span></code> column of the output <code class="docutils literal notranslate"><span class="pre">.vcf</span></code> file using simple quality
+thresholds. No variants are hard-filtered from the output file. Users may
+wish to apply alternative filtering for their datasets and applications
+using the -U, -P and -N options to <code class="docutils literal notranslate"><span class="pre">medaka_variant</span></code>.</p>
+</div>
+</div>
+<div class="section" id="further-improvements">
+<h2>Further Improvements<a class="headerlink" href="#further-improvements" title="Permalink to this headline">¶</a></h2>
+<p>Medaka SNP and indel calling is an extremely active area of research.
+We anticipate that the final step of variant calling, which amounts to a
+consensus call on a relatively pure haplotyped set of reads, will benefit
+(along with consensus calling) from further innovations in feature encoding,
+network architecture and training strategy. Future releases may also exploit
+direct snp and variant calling from mixed read populations.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="walkthrough.html" class="btn btn-neutral float-right" title="Walkthrough" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="benchmarks.html" class="btn btn-neutral float-left" title="Benchmarks" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

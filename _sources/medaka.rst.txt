@@ -1,0 +1,173 @@
+medaka package
+==============
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   medaka.test
+
+Submodules
+----------
+
+medaka.align module
+-------------------
+
+.. automodule:: medaka.align
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.common module
+--------------------
+
+.. automodule:: medaka.common
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.datastore module
+-----------------------
+
+.. automodule:: medaka.datastore
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.executor module
+----------------------
+
+.. automodule:: medaka.executor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.features module
+----------------------
+
+.. automodule:: medaka.features
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.keras\_ext module
+------------------------
+
+.. automodule:: medaka.keras_ext
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.labels module
+--------------------
+
+.. automodule:: medaka.labels
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.medaka module
+--------------------
+
+.. automodule:: medaka.medaka
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.medaka\_counts module
+----------------------------
+
+.. automodule:: medaka.medaka_counts
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.models module
+--------------------
+
+.. automodule:: medaka.models
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.options module
+---------------------
+
+.. automodule:: medaka.options
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.prediction module
+------------------------
+
+.. automodule:: medaka.prediction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.rle module
+-----------------
+
+.. automodule:: medaka.rle
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.smolecule module
+-----------------------
+
+.. automodule:: medaka.smolecule
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.stitch module
+--------------------
+
+.. automodule:: medaka.stitch
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.training module
+----------------------
+
+.. automodule:: medaka.training
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.variant module
+---------------------
+
+.. automodule:: medaka.variant
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.vcf module
+-----------------
+
+.. automodule:: medaka.vcf
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+medaka.wrappers module
+----------------------
+
+.. automodule:: medaka.wrappers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: medaka
+   :members:
+   :undoc-members:
+   :show-inheritance:

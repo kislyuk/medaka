@@ -1,0 +1,449 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Walkthrough &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Origin of the draft sequence" href="draft_origin.html" />
+    <link rel="prev" title="Human Variant Calling Benchmarks" href="snp.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Walkthrough</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#obtaining-data-and-software">Obtaining Data and Software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-draft-assembly">Creating a Draft Assembly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#polishing-a-consensus">Polishing a Consensus</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-a-consensus-network">Training a Consensus Network</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-with-multipe-data-types">Training with multipe data types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#automated-training-pipeline">Automated training pipeline</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Walkthrough</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/walkthrough.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="walkthrough">
+<span id="id1"></span><h1>Walkthrough<a class="headerlink" href="#walkthrough" title="Permalink to this headline">¶</a></h1>
+<p>The following shows how to train and use a simple form of consensus
+model from sequencing data obtained from R9.4 flowcells and the
+ligation sequencing kit.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The below assumes a Linux environment, some
+changes may need to be made on macOS. Windows environments are not
+supported. Environment variables set in one code block are assumed to
+persist through to other code blocks.</p>
+</div>
+<p>The below serves to demonstrate the process at a simple level. It does not
+represent a best-practices or state-of-the-art workflow. To train models
+which generalise well to other datasets more careful preparation of a larger
+dataset is required. Medaka’s standard models are trained using
+<a class="reference external" href="https://nanoporetech.github.io/katuali/medaka_train.html">katuali</a>.</p>
+<div class="section" id="obtaining-data-and-software">
+<h2>Obtaining Data and Software<a class="headerlink" href="#obtaining-data-and-software" title="Permalink to this headline">¶</a></h2>
+<p>Start by downloading training data, containing basecalls from Oxford Nanopore
+Technologies’ reads:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">WALKTHROUGH</span><span class="o">=</span><span class="si">${</span><span class="nv">PWD</span><span class="si">}</span>/medaka_walkthrough
+mkdir -p <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span> <span class="o">&amp;&amp;</span> <span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+wget https://s3-eu-west-1.amazonaws.com/ont-research/medaka_walkthrough_no_reads.tar.gz
+tar -xvf medaka_walkthrough_no_reads.tar.gz
+<span class="nv">DATA</span><span class="o">=</span><span class="si">${</span><span class="nv">PWD</span><span class="si">}</span>/data
+</pre></div>
+</div>
+<p>The extracted archive contains also all the intermediate output files that
+are created during the process below. Any step may be skipped by simply copying
+the requisite subfolder from the <code class="docutils literal notranslate"><span class="pre">${DATA}</span></code> directory into the <code class="docutils literal notranslate"><span class="pre">${WALKTHROUGH}</span></code>
+directory.</p>
+<p>The necessary software can be sourced using:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+git clone https://github.com/nanoporetech/pomoxis --recursive
+git clone https://github.com/nanoporetech/medaka
+
+<span class="c1"># While it is possible to install pomoxis and medaka into the same</span>
+<span class="c1">#   virtual environment, we will install each package into its own</span>
+<span class="c1">#   environment for simplicity. For more details see the readme for</span>
+<span class="c1">#   each of the packages.</span>
+
+<span class="nb">cd</span> pomoxis <span class="o">&amp;&amp;</span> make install <span class="o">&amp;&amp;</span> <span class="nb">cd</span> ..
+<span class="nb">cd</span> medaka <span class="o">&amp;&amp;</span> make install <span class="o">&amp;&amp;</span> <span class="nb">cd</span> ..
+
+<span class="nv">POMOXIS</span><span class="o">=</span><span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>/pomoxis/venv/bin/activate
+<span class="nv">MEDAKA</span><span class="o">=</span><span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>/medaka/venv/bin/activate
+</pre></div>
+</div>
+</div>
+<div class="section" id="creating-a-draft-assembly">
+<span id="basecalling-and-draft-assembly"></span><h2>Creating a Draft Assembly<a class="headerlink" href="#creating-a-draft-assembly" title="Permalink to this headline">¶</a></h2>
+<p>A draft assembly can be formed from the provided basecalls using the
+<a class="reference external" href="https://github.com/lh3/miniasm">miniasm</a> and
+<a class="reference external" href="https://github.com/isovic/racon">racon</a> based pipeline from <code class="docutils literal notranslate"><span class="pre">pomoxis</span></code>.
+Alternatively one could use <a class="reference external" href="https://github.com/marbl/canu">canu</a> at this step.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nv">NPROC</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
+<span class="nv">BASECALLS</span><span class="o">=</span>data/basecalls.fa
+<span class="nb">source</span> <span class="si">${</span><span class="nv">POMOXIS</span><span class="si">}</span>
+mini_assemble -i <span class="si">${</span><span class="nv">BASECALLS</span><span class="si">}</span> -o draft_assm -p assm -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>This will create a draft assembly at <code class="docutils literal notranslate"><span class="pre">draft_assm/assm_final.fa</span></code>. The
+<code class="docutils literal notranslate"><span class="pre">mini_assemble</span></code> script has two useful options not used here:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>specifying <code class="docutils literal notranslate"><span class="pre">-c</span></code> will run <a class="reference external" href="https://github.com/rrwick/Porechop">porechop</a>
+on the reads to first trim sequencing adapters and,</p></li>
+<li><p>specifying <code class="docutils literal notranslate"><span class="pre">-e</span> <span class="pre">10</span></code> will perform error correction on the longest 10% of
+reads prior to assembly (similar to the strategy of canu).</p></li>
+</ul>
+</div></blockquote>
+<p>Both these steps can improve the assembly quality at the expense of speed.</p>
+<p>The number and length of the assembled contigs can be checked</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">DRAFT</span><span class="o">=</span>draft_assm/assm_final.fa
+awk <span class="s1">&#39;{if(/&gt;/){n=$1}else{print n &quot; &quot; length($0)}}&#39;</span> <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>The expected output is a contig 4,703,280 bases long (utg000001c).</p>
+</div>
+<div class="section" id="polishing-a-consensus">
+<span id="polishing"></span><h2>Polishing a Consensus<a class="headerlink" href="#polishing-a-consensus" title="Permalink to this headline">¶</a></h2>
+<p>After performing all steps up to <a class="reference internal" href="#basecalling-and-draft-assembly"><span class="std std-ref">Creating a Draft Assembly</span></a>, the
+following commands can be run to yield a consensus using <code class="docutils literal notranslate"><span class="pre">medaka</span></code>’s default
+model. This model was trained using data obtained from E.coli, S.cerevisaie,
+and H.sapiens samples.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>
+<span class="nv">CONSENSUS</span><span class="o">=</span>consensus
+<span class="nv">DRAFT</span><span class="o">=</span>draft_assm/assm_final.fa
+medaka_consensus -i <span class="si">${</span><span class="nv">BASECALLS</span><span class="si">}</span> -d <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -o <span class="si">${</span><span class="nv">CONSENSUS</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>To polish an assembly using another model, use
+the <code class="docutils literal notranslate"><span class="pre">-m</span></code> option to specify the filepath of the model.</p>
+<p>Alignment statistics can be calculated using the <code class="docutils literal notranslate"><span class="pre">assess_assembly</span></code> program from
+pomoxis:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nb">source</span> <span class="si">${</span><span class="nv">POMOXIS</span><span class="si">}</span>
+<span class="nv">TRUTH</span><span class="o">=</span><span class="si">${</span><span class="nv">DATA</span><span class="si">}</span>/truth.fasta
+<span class="nv">DRAFT2TRUTH</span><span class="o">=</span>draft_to_truth
+<span class="nv">CONSENSUS2TRUTH</span><span class="o">=</span><span class="si">${</span><span class="nv">CONSENSUS</span><span class="si">}</span>_to_truth
+<span class="nb">echo</span> <span class="s2">&quot;Draft assembly&quot;</span>
+assess_assembly -i <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -r <span class="si">${</span><span class="nv">TRUTH</span><span class="si">}</span> -p <span class="si">${</span><span class="nv">DRAFT2TRUTH</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span>
+<span class="nb">echo</span> <span class="s2">&quot;Medaka consensus&quot;</span>
+assess_assembly -i <span class="si">${</span><span class="nv">CONSENSUS</span><span class="si">}</span>/consensus.fasta -r <span class="si">${</span><span class="nv">TRUTH</span><span class="si">}</span> -p <span class="si">${</span><span class="nv">CONSENSUS2TRUTH</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>An decrease in error rate from 0.367% to 0.070% should be observed.</p>
+</div>
+<div class="section" id="training-a-consensus-network">
+<span id="training"></span><h2>Training a Consensus Network<a class="headerlink" href="#training-a-consensus-network" title="Permalink to this headline">¶</a></h2>
+<p>In order to train a bespoke network first perform all the steps up to and
+including <a class="reference internal" href="#basecalling-and-draft-assembly"><span class="std std-ref">Creating a Draft Assembly</span></a> above.</p>
+<p>The ultimate aim of the consensus network is to predict the truth sequence from
+the alignment of basecalls to the draft. This requires understanding how the
+basecalls may align to the draft and how the draft must be edited to obtain the
+truth. The draft acts as a common frame-of-reference between the basecalls
+and the truth.</p>
+<p>The basecalls and truth sequence are aligned to the draft. For the latter, this
+is performed in chunks.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nv">DRAFT</span><span class="o">=</span>draft_assm/assm_final.fa
+<span class="nv">TRUTH</span><span class="o">=</span><span class="si">${</span><span class="nv">DATA</span><span class="si">}</span>/truth.fasta
+<span class="nb">source</span> <span class="si">${</span><span class="nv">POMOXIS</span><span class="si">}</span>
+<span class="nv">CHUNKSIZE</span><span class="o">=</span><span class="m">100000</span>
+<span class="nv">CALLS2DRAFT</span><span class="o">=</span>calls2draft
+<span class="nv">TRUTH2DRAFT</span><span class="o">=</span>truth2draft
+
+mini_align -P -m -r <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -i <span class="si">${</span><span class="nv">BASECALLS</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span> -p <span class="si">${</span><span class="nv">CALLS2DRAFT</span><span class="si">}</span>
+mini_align -c <span class="si">${</span><span class="nv">CHUNKSIZE</span><span class="si">}</span> -P -m -r <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -i <span class="si">${</span><span class="nv">TRUTH</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span> -p <span class="si">${</span><span class="nv">TRUTH2DRAFT</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>These raw alignments must now be converted into features for input into a neural
+network. To reduce any IO bottlenecks during training, the training data can be
+written to the <code class="docutils literal notranslate"><span class="pre">HDF5</span></code> file in batches using the <code class="docutils literal notranslate"><span class="pre">-\\-batch_size</span></code> option. The option
+<code class="docutils literal notranslate"><span class="pre">-\\-read_fraction</span></code> is used to randomly subsample reads which has the effect of
+making the resultant model more robust to variations in pileup depth when the
+model is used to make predictions.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>
+<span class="nv">REFNAME</span><span class="o">=</span>utg000001c
+<span class="nv">TRAINEND</span><span class="o">=</span><span class="m">3762624</span>
+<span class="nv">TRAINFEATURES</span><span class="o">=</span>train_features.hdf
+<span class="nv">BATCHSIZE</span><span class="o">=</span><span class="m">100</span>
+medaka features <span class="si">${</span><span class="nv">CALLS2DRAFT</span><span class="si">}</span>.bam <span class="si">${</span><span class="nv">TRAINFEATURES</span><span class="si">}</span> --truth <span class="si">${</span><span class="nv">TRUTH2DRAFT</span><span class="si">}</span>.bam --threads <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span> --region <span class="si">${</span><span class="nv">REFNAME</span><span class="si">}</span>:-<span class="si">${</span><span class="nv">TRAINEND</span><span class="si">}</span> --batch_size <span class="si">${</span><span class="nv">BATCHSIZE</span><span class="si">}</span> --chunk_len <span class="m">1000</span> --chunk_ovlp <span class="m">0</span>
+</pre></div>
+</div>
+<p>Now everything is in place to train a consensus network with <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">train</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>
+<span class="nv">TRAINNAME</span><span class="o">=</span>training
+medaka train <span class="si">${</span><span class="nv">TRAINFEATURES</span><span class="si">}</span> --train_name <span class="si">${</span><span class="nv">TRAINNAME</span><span class="si">}</span> --epochs <span class="m">10</span>
+</pre></div>
+</div>
+<p>Depending on the compute resources available, this step may take some time.
+During training, models are regularly checkpointed so that training may be
+easily resumed if interrupted. At the end of training, we have a number of
+output models including in particular:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">model.best.hdf5</span></code>: model with the best accuracy over the training set</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">model.best.val.hdf5</span></code>: model with the best accuracy over the validation set</p></li>
+</ul>
+</div></blockquote>
+<p>Other ancilliary output are also produced.</p>
+<p>To use a model run <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code>, specifying the full absolute path to
+the model using the <code class="docutils literal notranslate"><span class="pre">-m</span></code> option:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> <span class="si">${</span><span class="nv">WALKTHROUGH</span><span class="si">}</span>
+<span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>
+<span class="nv">CONSENSUS</span><span class="o">=</span>consensus_trained
+<span class="nv">MODEL</span><span class="o">=</span><span class="si">${</span><span class="nv">PWD</span><span class="si">}</span>/<span class="si">${</span><span class="nv">TRAINNAME</span><span class="si">}</span>/model.best.val.hdf5
+medaka_consensus -i <span class="si">${</span><span class="nv">BASECALLS</span><span class="si">}</span> -d <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -o <span class="si">${</span><span class="nv">CONSENSUS</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span> -m <span class="si">${</span><span class="nv">MODEL</span><span class="si">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="training-with-multipe-data-types">
+<h2>Training with multipe data types<a class="headerlink" href="#training-with-multipe-data-types" title="Permalink to this headline">¶</a></h2>
+<p>Medaka supports creating inference networks that handle independently data from
+difference sources, for example two distinct nanopores. The is enabled through
+the use of alignment tags in the input <code class="docutils literal notranslate"><span class="pre">.bam</span></code> files.</p>
+<p>To train a model which can handle multiple datatypes follow the same process as above
+for all datatypes independently until the <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">feature</span></code> step. Before this combine
+the <code class="docutils literal notranslate"><span class="pre">.bam</span></code> files whilst adding the string tag <code class="docutils literal notranslate"><span class="pre">DT</span></code> to the files. For example to
+combine data for the R9 and R10 pores:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>samtools view r9.bam <span class="p">|</span> awk <span class="s1">&#39;BEGIN{OFS=&quot;\t&quot;}{print $0, &quot;DT:Z:r9&quot;}&#39;</span> &gt; r9.sam
+samtools view r10.bam <span class="p">|</span> awk <span class="s1">&#39;BEGIN{OFS=&quot;\t&quot;}{print $0, &quot;DT:Z:r10&quot;}&#39;</span> &gt; r10.sam
+samtools view -H r9.bam <span class="p">|</span> cat - r9.sam r10.sam <span class="p">|</span> samtools view -bS <span class="p">|</span> samtools sort &gt; all_reads.bam
+samtools index all_reads.bam
+</pre></div>
+</div>
+<p>Having combined the data types training a model simply requires an additional
+argument to <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">features</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>medaka features all_reads.bam ... --feature_encoder_args <span class="nv">dtypes</span><span class="o">=</span>r9,r10
+</pre></div>
+</div>
+<p>In order to create consensus sequences using models trained for multiple
+datatypes, the input <code class="docutils literal notranslate"><span class="pre">.bam</span></code> to <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span></code> should have the <code class="docutils literal notranslate"><span class="pre">DT</span></code>
+tag added appropriately to all reads. Models trained for multiple datatypes
+will not work without this tag being added to the input files.</p>
+</div>
+<div class="section" id="automated-training-pipeline">
+<h2>Automated training pipeline<a class="headerlink" href="#automated-training-pipeline" title="Permalink to this headline">¶</a></h2>
+<p>With <a class="reference external" href="https://nanoporetech.github.io/katuali/medaka_train.html">katuali</a> it
+is now possible to train medaka models starting from folders of fast5s in a single
+command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>katuali medaka_train_replicates --keep-going
+</pre></div>
+</div>
+<p>Running the above will</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>basecall all multiple runs of data,</p></li>
+<li><p>align all basecalls to reference sequences,</p></li>
+<li><p>create subsampled sets of basecalls over reference sequences and depths,</p></li>
+<li><p>assemble those sets of basecalls into draft assemblies,</p></li>
+<li><p>create medaka training features for all assemblies,</p></li>
+<li><p>train a medaka in multiple replicates, and</p></li>
+<li><p>evaluate the models on test data.</p></li>
+</ul>
+</div></blockquote>
+<p>For further information concerning settig-up adnd running katuali, refer to
+its <a class="reference external" href="https://nanoporetech.github.io/">documentation</a>.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="draft_origin.html" class="btn btn-neutral float-right" title="Origin of the draft sequence" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="snp.html" class="btn btn-neutral float-left" title="Human Variant Calling Benchmarks" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

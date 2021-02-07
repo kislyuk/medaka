@@ -1,0 +1,1155 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.common &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.common</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.common</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Commonly used data structures and functions.&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">from</span> <span class="nn">distutils.version</span> <span class="kn">import</span> <span class="n">LooseVersion</span>
+<span class="kn">import</span> <span class="nn">enum</span>
+<span class="kn">import</span> <span class="nn">errno</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">intervaltree</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">pkg_resources</span> <span class="kn">import</span> <span class="n">resource_filename</span>
+<span class="kn">import</span> <span class="nn">pysam</span>
+
+<span class="kn">import</span> <span class="nn">libmedaka</span>
+
+<span class="n">ComprAlignPos</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s1">&#39;ComprAlignPos&#39;</span><span class="p">,</span>
+    <span class="p">(</span><span class="s1">&#39;qpos&#39;</span><span class="p">,</span> <span class="s1">&#39;qbase&#39;</span><span class="p">,</span> <span class="s1">&#39;qlen&#39;</span><span class="p">,</span> <span class="s1">&#39;rpos&#39;</span><span class="p">,</span> <span class="s1">&#39;rbase&#39;</span><span class="p">,</span> <span class="s1">&#39;rlen&#39;</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="OverlapException"><a class="viewcode-back" href="../../medaka.html#medaka.common.OverlapException">[docs]</a><span class="k">class</span> <span class="nc">OverlapException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Exception class used when examining range overlaps.&quot;&quot;&quot;</span>
+
+    <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="Relationship"><a class="viewcode-back" href="../../medaka.html#medaka.common.Relationship">[docs]</a><span class="k">class</span> <span class="nc">Relationship</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Enumeration of types of overlap.&quot;&quot;&quot;</span>
+
+    <span class="n">different_ref_name</span> <span class="o">=</span> <span class="s1">&#39;Samples come from different reference contigs.&#39;</span>
+    <span class="n">forward_overlap</span> <span class="o">=</span> <span class="s1">&#39;The end of s1 overlaps the start of s2.&#39;</span>
+    <span class="n">reverse_overlap</span> <span class="o">=</span> <span class="s1">&#39;The end of s2 overlaps the start of s1.&#39;</span>
+    <span class="n">forward_abutted</span> <span class="o">=</span> <span class="s1">&#39;The end of s1 abuts the start of s2.&#39;</span>
+    <span class="n">reverse_abutted</span> <span class="o">=</span> <span class="s1">&#39;The end of s2 abuts the start of s1.&#39;</span>
+    <span class="n">forward_gapped</span> <span class="o">=</span> <span class="s1">&#39;s2 follows s1 with a gab inbetween.&#39;</span>
+    <span class="n">reverse_gapped</span> <span class="o">=</span> <span class="s1">&#39;s1 follows s2 with a gab inbetween.&#39;</span>
+    <span class="n">s2_within_s1</span> <span class="o">=</span> <span class="s1">&#39;s2 is fully contained within s1.&#39;</span>
+    <span class="n">s1_within_s2</span> <span class="o">=</span> <span class="s1">&#39;s1 is fully contained within s2.&#39;</span></div>
+
+
+<span class="c1"># provide read only access to key sample attrs</span>
+<span class="n">_Sample</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s1">&#39;Sample&#39;</span><span class="p">,</span>
+    <span class="p">[</span><span class="s1">&#39;ref_name&#39;</span><span class="p">,</span> <span class="s1">&#39;features&#39;</span><span class="p">,</span> <span class="s1">&#39;labels&#39;</span><span class="p">,</span> <span class="s1">&#39;ref_seq&#39;</span><span class="p">,</span> <span class="s1">&#39;positions&#39;</span><span class="p">,</span> <span class="s1">&#39;label_probs&#39;</span><span class="p">])</span>
+
+
+<div class="viewcode-block" id="Sample"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample">[docs]</a><span class="k">class</span> <span class="nc">Sample</span><span class="p">(</span><span class="n">_Sample</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represents a pileup range.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_asdict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># https://bugs.python.org/issue24931</span>
+        <span class="k">return</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">,</span> <span class="bp">self</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Sample.amend"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.amend">[docs]</a>    <span class="k">def</span> <span class="nf">amend</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create new `Sample` with some attributes changed.&quot;&quot;&quot;</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s1">&#39;Invalid key for Sample: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
+            <span class="n">d</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">return</span> <span class="n">Sample</span><span class="p">(</span><span class="o">**</span><span class="n">d</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_get_pos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">positions</span>
+        <span class="k">return</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">][</span><span class="n">index</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s1">&#39;minor&#39;</span><span class="p">][</span><span class="n">index</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">first_pos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Zero-based first reference co-ordinate.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pos</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">last_pos</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Zero-based (end inclusive) last reference co-ordinate.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pos</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Size of sample in terms of reference positions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">first_pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Is pileup empty, synomymous to `sample.size == 0`.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return number of columns of pileup.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">positions</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create zero-based (end inclusive) samtools-style region string.&quot;&quot;&quot;</span>
+        <span class="n">fmaj</span><span class="p">,</span> <span class="n">fmin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">first_pos</span>
+        <span class="n">lmaj</span><span class="p">,</span> <span class="n">lmin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_pos</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">-</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">fmaj</span><span class="p">,</span> <span class="n">fmin</span><span class="p">,</span> <span class="n">lmaj</span><span class="p">,</span> <span class="n">lmin</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Sample.decode_sample_name"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.decode_sample_name">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">decode_sample_name</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Decode a the result of Sample.name into a dict.</span>
+
+<span class="sd">        :param key: `Sample` object.</span>
+<span class="sd">        :returns: dict.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">name_decoder</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+            <span class="sa">r</span><span class="s2">&quot;(?P&lt;ref_name&gt;.+):(?P&lt;start&gt;\d+\.\d+)-(?P&lt;end&gt;\d+\.\d+)&quot;</span><span class="p">)</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">name_decoder</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">groupdict</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+
+<div class="viewcode-block" id="Sample.from_samples"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.from_samples">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">from_samples</span><span class="p">(</span><span class="n">samples</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a sample by concatenating an iterable of `Sample` objects.</span>
+
+<span class="sd">        :param samples: iterable of `Sample` objects.</span>
+<span class="sd">        :returns: `Sample` obj</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">samples</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">samples</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+            <span class="n">rel</span> <span class="o">=</span> <span class="n">Sample</span><span class="o">.</span><span class="n">relative_position</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_abutted</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s1">&#39;Refusing to concatenate unordered/non-abutting &#39;</span>
+                    <span class="s1">&#39;samples </span><span class="si">{}</span><span class="s1"> and </span><span class="si">{}</span><span class="s1"> with relationship </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">repr</span><span class="p">(</span><span class="n">rel</span><span class="p">)))</span>
+
+        <span class="c1"># Relationship.forward_abutted guarantees all samples have the</span>
+        <span class="c1"># same ref_name</span>
+        <span class="n">non_concat_fields</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;ref_name&#39;</span><span class="p">}</span>
+
+        <span class="k">def</span> <span class="nf">concat_attr</span><span class="p">(</span><span class="n">attr</span><span class="p">):</span>
+            <span class="n">vals</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">attr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">non_concat_fields</span><span class="p">:</span>
+                <span class="n">all_none</span> <span class="o">=</span> <span class="nb">all</span><span class="p">([</span><span class="n">v</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">vals</span><span class="p">])</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">all_none</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">vals</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span>
+                <span class="n">c</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">c</span>
+
+        <span class="k">return</span> <span class="n">Sample</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">attr</span><span class="p">:</span>  <span class="n">concat_attr</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">Sample</span><span class="o">.</span><span class="n">_fields</span><span class="p">})</span></div>
+
+<div class="viewcode-block" id="Sample.relative_position"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.relative_position">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">relative_position</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check the relative position of two samples in genomic coordinates.</span>
+
+<span class="sd">        :param s1, s2: `medaka.common.Sample` objs.</span>
+
+<span class="sd">        :returns: `Relationship` enum member.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">ordered_abuts</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Check if end of s1 abuts the start of s2.</span>
+
+<span class="sd">            i.e. is adjacent but not overlapping</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">s1_end_maj</span><span class="p">,</span> <span class="n">s1_end_min</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">last_pos</span>
+            <span class="n">s2_start_maj</span><span class="p">,</span> <span class="n">s2_start_min</span> <span class="o">=</span> <span class="n">s2</span><span class="o">.</span><span class="n">first_pos</span>
+            <span class="k">if</span> <span class="n">s2_start_maj</span> <span class="o">==</span> <span class="n">s1_end_maj</span> <span class="o">+</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">s2_start_min</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">abuts</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">s2_start_maj</span> <span class="o">==</span> <span class="n">s1_end_maj</span> <span class="ow">and</span> <span class="n">s2_start_min</span> <span class="o">==</span> <span class="n">s1_end_min</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">abuts</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">abuts</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">return</span> <span class="n">abuts</span>
+
+        <span class="k">def</span> <span class="nf">ordered_contained</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Check if s2 is contained within s1.&quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">s2</span><span class="o">.</span><span class="n">first_pos</span> <span class="o">&gt;=</span> <span class="n">s1</span><span class="o">.</span><span class="n">first_pos</span> <span class="ow">and</span> <span class="n">s2</span><span class="o">.</span><span class="n">last_pos</span> <span class="o">&lt;=</span> <span class="n">s1</span><span class="o">.</span><span class="n">last_pos</span>
+
+        <span class="k">def</span> <span class="nf">ordered_overlaps</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Check if end of s1 overlaps start of s2.&quot;&quot;&quot;</span>
+            <span class="n">s1_end_maj</span><span class="p">,</span> <span class="n">s1_end_min</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">last_pos</span>
+            <span class="n">s2_start_maj</span><span class="p">,</span> <span class="n">s2_start_min</span> <span class="o">=</span> <span class="n">s2</span><span class="o">.</span><span class="n">first_pos</span>
+            <span class="k">if</span> <span class="n">s2_start_maj</span> <span class="o">&lt;</span> <span class="n">s1_end_maj</span><span class="p">:</span>  <span class="c1"># overlap of major coordinates</span>
+                <span class="n">overlaps</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">s2_start_maj</span> <span class="o">==</span> <span class="n">s1_end_maj</span> <span class="ow">and</span> <span class="n">s2_start_min</span> <span class="o">&lt;</span> <span class="n">s1_end_min</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># we have overlap of minor coordinates</span>
+                <span class="n">overlaps</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">overlaps</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">return</span> <span class="n">overlaps</span>
+
+        <span class="k">def</span> <span class="nf">ordered_gapped</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Check for grap between end of s1 and start of s2.&quot;&quot;&quot;</span>
+            <span class="n">s1_end_maj</span><span class="p">,</span> <span class="n">s1_end_min</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">last_pos</span>
+            <span class="n">s2_start_maj</span><span class="p">,</span> <span class="n">s2_start_min</span> <span class="o">=</span> <span class="n">s2</span><span class="o">.</span><span class="n">first_pos</span>
+            <span class="n">gapped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">s2_start_maj</span> <span class="o">&gt;</span> <span class="n">s1_end_maj</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># gap in major</span>
+                <span class="n">gapped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">s2_start_maj</span> <span class="o">&gt;</span> <span class="n">s1_end_maj</span> <span class="ow">and</span>
+                    <span class="n">s2_start_min</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">):</span>  <span class="c1"># missing minors</span>
+                <span class="n">gapped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="p">(</span><span class="n">s2_start_maj</span> <span class="o">==</span> <span class="n">s1_end_maj</span> <span class="ow">and</span>
+                    <span class="n">s2_start_min</span> <span class="o">&gt;</span> <span class="n">s1_end_min</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>  <span class="c1"># missing minors</span>
+                <span class="n">gapped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">return</span> <span class="n">gapped</span>
+
+        <span class="k">if</span> <span class="n">s1</span><span class="o">.</span><span class="n">ref_name</span> <span class="o">!=</span> <span class="n">s2</span><span class="o">.</span><span class="n">ref_name</span><span class="p">:</span>  <span class="c1"># different ref_names</span>
+            <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">different_ref_name</span>
+
+        <span class="n">s1_ord</span><span class="p">,</span> <span class="n">s2_ord</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">((</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">first_pos</span><span class="p">,</span> <span class="o">-</span><span class="n">x</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+        <span class="n">is_ordered</span> <span class="o">=</span> <span class="n">s1_ord</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">s1</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="c1"># is one sample within the other?</span>
+        <span class="k">if</span> <span class="n">ordered_contained</span><span class="p">(</span><span class="n">s1_ord</span><span class="p">,</span> <span class="n">s2_ord</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_ordered</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">s2_within_s1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">s1_within_s2</span>
+
+        <span class="c1"># do samples abut?</span>
+        <span class="k">elif</span> <span class="n">ordered_abuts</span><span class="p">(</span><span class="n">s1_ord</span><span class="p">,</span> <span class="n">s2_ord</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_ordered</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_abutted</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">reverse_abutted</span>
+
+        <span class="c1"># do samples overlap?</span>
+        <span class="k">elif</span> <span class="n">ordered_overlaps</span><span class="p">(</span><span class="n">s1_ord</span><span class="p">,</span> <span class="n">s2_ord</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_ordered</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_overlap</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">reverse_overlap</span>
+
+        <span class="c1"># if we got this far there should be a gap between s1_ord and s2_ord</span>
+        <span class="k">elif</span> <span class="n">ordered_gapped</span><span class="p">(</span><span class="n">s1_ord</span><span class="p">,</span> <span class="n">s2_ord</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_ordered</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_gapped</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">reverse_gapped</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s1">&#39;Could not calculate relative position of </span><span class="si">{}</span><span class="s1"> and </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Sample.overlap_indices"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.overlap_indices">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">overlap_indices</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Find indices by which to trim samples to allow concatenation.</span>
+
+<span class="sd">        ::</span>
+<span class="sd">            #          | end1</span>
+<span class="sd">            s1 ............</span>
+<span class="sd">            s2      ...............</span>
+<span class="sd">            #          | start2</span>
+
+
+<span class="sd">        For example:</span>
+
+<span class="sd">        .. code: python</span>
+
+<span class="sd">            Sample.from_samples([</span>
+<span class="sd">                s1.slice(slice(0, end1)),</span>
+<span class="sd">                s2.slice(slice(start2, None))])</span>
+
+<span class="sd">        would join the samples without gaps or overlap.</span>
+
+<span class="sd">        :param s1: First `Sample` object.</span>
+<span class="sd">        :param s2: Second `Sample` object.</span>
+
+<span class="sd">        :returns: (end1, start2</span>
+<span class="sd">        :raises: `OverlapException` if samples do not overlap nor abut.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">heuristic</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">rel</span> <span class="o">=</span> <span class="n">Sample</span><span class="o">.</span><span class="n">relative_position</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+
+        <span class="c1"># trivial case</span>
+        <span class="k">if</span> <span class="n">rel</span> <span class="ow">is</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_abutted</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">heuristic</span>
+
+        <span class="k">if</span> <span class="n">rel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_overlap</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Cannot overlap samples </span><span class="si">{}</span><span class="s1"> and </span><span class="si">{}</span><span class="s1"> with relationhip </span><span class="si">{}</span><span class="s1">&#39;</span>
+            <span class="k">raise</span> <span class="n">OverlapException</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">repr</span><span class="p">(</span><span class="n">rel</span><span class="p">)))</span>
+
+        <span class="c1"># find where the overlap starts (ends) in s1 (s2) indices</span>
+        <span class="n">ovl_start_ind1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">ovl_end_ind2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span>
+            <span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">side</span><span class="o">=</span><span class="s1">&#39;right&#39;</span><span class="p">)</span>
+
+        <span class="n">end_1_ind</span><span class="p">,</span> <span class="n">start_2_ind</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="n">pos1_ovl</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">ovl_start_ind1</span><span class="p">:]</span>
+        <span class="n">pos2_ovl</span> <span class="o">=</span> <span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">ovl_end_ind2</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># the nice case where everything lines up</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">pos1_ovl</span><span class="p">[</span><span class="s1">&#39;minor&#39;</span><span class="p">],</span> <span class="n">pos2_ovl</span><span class="p">[</span><span class="s1">&#39;minor&#39;</span><span class="p">]):</span>
+                <span class="k">raise</span> <span class="n">OverlapException</span><span class="p">(</span><span class="s2">&quot;Overlaps are not equal in structure&quot;</span><span class="p">)</span>
+            <span class="n">overlap_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pos1_ovl</span><span class="p">)</span>
+            <span class="c1"># take mid point as break point</span>
+            <span class="n">pad_1</span> <span class="o">=</span> <span class="n">overlap_len</span> <span class="o">//</span> <span class="mi">2</span>
+            <span class="n">pad_2</span> <span class="o">=</span> <span class="n">overlap_len</span> <span class="o">-</span> <span class="n">pad_1</span>
+            <span class="n">end_1_ind</span> <span class="o">=</span> <span class="n">ovl_start_ind1</span> <span class="o">+</span> <span class="n">pad_1</span>
+            <span class="n">start_2_ind</span> <span class="o">=</span> <span class="n">ovl_end_ind2</span> <span class="o">-</span> <span class="n">pad_2</span>
+
+            <span class="n">contr_1</span> <span class="o">=</span> <span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">ovl_start_ind1</span><span class="p">:</span><span class="n">end_1_ind</span><span class="p">]</span>
+            <span class="n">contr_2</span> <span class="o">=</span> <span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="n">start_2_ind</span><span class="p">:</span><span class="n">ovl_end_ind2</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">contr_1</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">contr_2</span><span class="p">)</span> <span class="o">!=</span> <span class="n">overlap_len</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">OverlapException</span><span class="p">(</span>
+                    <span class="s2">&quot;Resultant is not same length as overlap.&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">OverlapException</span><span class="p">:</span>
+            <span class="n">heuristic</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="c1"># Some sample producing methods will not create 1-to-1 mappings</span>
+            <span class="c1"># in their sets of columns, e.g. where chunking has affected the</span>
+            <span class="c1"># reads used. Here we find a split point near the middle where</span>
+            <span class="c1"># the two halfs have the same number of minor positions</span>
+            <span class="c1"># (i.e. look similar).</span>
+            <span class="c1"># Require seeing a number of major positions</span>
+            <span class="n">UNIQ_MAJ</span> <span class="o">=</span> <span class="mi">3</span>
+            <span class="n">end_1_ind</span><span class="p">,</span> <span class="n">start_2_ind</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">pos1_ovl</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">]))</span> <span class="o">&gt;</span> <span class="n">UNIQ_MAJ</span> <span class="ow">and</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">pos2_ovl</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">]))</span> <span class="o">&gt;</span> <span class="n">UNIQ_MAJ</span><span class="p">):</span>
+
+                <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">pos1_ovl</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">pos1_ovl</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">mid</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="p">(</span><span class="n">end</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+                <span class="n">offset</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="k">while</span> <span class="n">end_1_ind</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+
+                    <span class="k">if</span> <span class="p">(</span><span class="n">mid</span> <span class="o">+</span> <span class="n">offset</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">])</span> <span class="ow">and</span>
+                            <span class="n">mid</span> <span class="o">-</span> <span class="n">offset</span> <span class="o">&lt;</span> <span class="nb">min</span><span class="p">(</span><span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">])):</span>
+                        <span class="c1"># run off the edge</span>
+                        <span class="k">break</span>
+                    <span class="k">for</span> <span class="n">test</span> <span class="ow">in</span> <span class="p">(</span><span class="o">+</span><span class="n">offset</span><span class="p">,</span> <span class="o">-</span><span class="n">offset</span><span class="p">):</span>
+                        <span class="n">left</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                            <span class="n">s1</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">mid</span> <span class="o">+</span> <span class="n">test</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="n">right</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                            <span class="n">s2</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">mid</span> <span class="o">+</span> <span class="n">test</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">left</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">right</span><span class="p">):</span>
+                            <span class="c1"># found a nice junction</span>
+                            <span class="n">end_1_ind</span> <span class="o">=</span> <span class="n">left</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                            <span class="n">start_2_ind</span> <span class="o">=</span> <span class="n">right</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                            <span class="k">break</span>
+                    <span class="n">offset</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">end_1_ind</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">start_2_ind</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">OverlapException</span><span class="p">(</span>
+                    <span class="s2">&quot;Could not find viable junction for </span><span class="si">{}</span><span class="s2"> and </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">end_1_ind</span><span class="p">,</span> <span class="n">start_2_ind</span><span class="p">,</span> <span class="n">heuristic</span></div>
+
+<div class="viewcode-block" id="Sample.chunks"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.chunks">[docs]</a>    <span class="k">def</span> <span class="nf">chunks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunk_len</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="mi">200</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create overlapping chunks of self.</span>
+
+<span class="sd">        :param chunk_len: chunk length (number of columns)</span>
+<span class="sd">        :param overlap: overlap length.</span>
+
+<span class="sd">        :yields: chunked `Sample` instances.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO - could refactor this to use Sample.slice?</span>
+        <span class="n">chunker</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
+            <span class="n">sliding_window</span><span class="p">,</span>
+            <span class="n">window</span><span class="o">=</span><span class="n">chunk_len</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">chunk_len</span> <span class="o">-</span> <span class="n">overlap</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">chunkers</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">field</span><span class="p">:</span> <span class="n">chunker</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">))</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">chunkers</span><span class="p">[</span><span class="s1">&#39;positions&#39;</span><span class="p">]:</span>
+            <span class="n">fields</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">([</span><span class="s1">&#39;positions&#39;</span><span class="p">,</span> <span class="s1">&#39;ref_name&#39;</span><span class="p">])</span>
+            <span class="n">new_sample</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;positions&#39;</span><span class="p">:</span> <span class="n">pos</span><span class="p">,</span> <span class="s1">&#39;ref_name&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_name</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+                <span class="n">new_sample</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">chunkers</span><span class="p">[</span><span class="n">field</span><span class="p">])</span>
+            <span class="k">yield</span> <span class="n">Sample</span><span class="p">(</span><span class="o">**</span><span class="n">new_sample</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Sample.slice"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.slice">[docs]</a>    <span class="k">def</span> <span class="nf">slice</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Slice fields along the genomic axis.</span>
+
+<span class="sd">        :param key: slice or index (on array indices)</span>
+<span class="sd">        :returns: `Sample` obj with views of slices of the original `Sample`.</span>
+
+<span class="sd">        &gt;&gt;&gt; pos = np.array(</span>
+<span class="sd">        ...     [(0, 0), (1, 0), (1, 1), (2, 0)],</span>
+<span class="sd">        ...     dtype=[(&#39;major&#39;, int), (&#39;minor&#39;, int)])</span>
+<span class="sd">        &gt;&gt;&gt; feat = np.arange(len(pos))</span>
+<span class="sd">        &gt;&gt;&gt; s = Sample(&#39;contig1&#39;, feat , None, None, pos, None)</span>
+<span class="sd">        &gt;&gt;&gt; s.slice(2)  #doctest: +ELLIPSIS</span>
+<span class="sd">        Sample(...features=2, ..., positions=(1, 1), label_probs=None)</span>
+<span class="sd">        &gt;&gt;&gt; s.slice(slice(1,3)) #doctest: +ELLIPSIS</span>
+<span class="sd">        Sample(..., features=array([1, 2]),...)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">non_slice_fields</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;ref_name&#39;</span><span class="p">}</span>
+
+        <span class="k">def</span> <span class="nf">slice_attr</span><span class="p">(</span><span class="n">attr</span><span class="p">):</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">attr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">non_slice_fields</span><span class="p">:</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">if</span> <span class="n">a</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="n">a</span>
+        <span class="k">return</span> <span class="n">Sample</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">attr</span><span class="p">:</span> <span class="n">slice_attr</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">})</span></div>
+
+    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Test equality.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fields</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+            <span class="n">o</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">field</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">type</span><span class="p">(</span><span class="n">o</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">o</span><span class="o">.</span><span class="n">shape</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">s</span> <span class="o">!=</span> <span class="n">o</span><span class="p">)):</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">s</span> <span class="o">!=</span> <span class="n">o</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="Sample.trim_samples"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.trim_samples">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">trim_samples</span><span class="p">(</span><span class="n">sample_gen</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Generate trimmed samples.</span>
+
+<span class="sd">        Samples are trimmed to remove overlap between adjacent samples.</span>
+
+<span class="sd">        :param sample_gen: generator yielding `medaka.common.Sample` s</span>
+
+<span class="sd">        :yields: (`medaka.common.Sample` view, bool is_last_in_contig,</span>
+<span class="sd">            bool heuristic)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;TrimOverlap&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">s1</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">sample_gen</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+            <span class="c1"># there were no samples to process</span>
+            <span class="k">return</span>
+        <span class="c1"># do not trim beginning of s1</span>
+        <span class="n">start_1</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># initialise in case we have one sample</span>
+        <span class="n">start_2</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">s2</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">sample_gen</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,)):</span>
+            <span class="n">heuristic</span> <span class="o">=</span> <span class="kc">False</span>
+
+            <span class="n">is_last_in_contig</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="c1"># s1 is last chunk</span>
+            <span class="k">if</span> <span class="n">s2</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># go to end of s1</span>
+                <span class="n">end_1</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">is_last_in_contig</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rel</span> <span class="o">=</span> <span class="n">Sample</span><span class="o">.</span><span class="n">relative_position</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+                <span class="c1"># skip s2 if it is contained within s1</span>
+                <span class="k">if</span> <span class="n">rel</span> <span class="ow">is</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">s2_within_s1</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> is contained within </span><span class="si">{}</span><span class="s1">, skipping.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+                    <span class="k">continue</span>
+                <span class="k">elif</span> <span class="n">rel</span> <span class="ow">is</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_overlap</span><span class="p">:</span>
+                    <span class="n">end_1</span><span class="p">,</span> <span class="n">start_2</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Sample</span><span class="o">.</span><span class="n">overlap_indices</span><span class="p">(</span>
+                        <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">rel</span> <span class="ow">is</span> <span class="n">Relationship</span><span class="o">.</span><span class="n">forward_gapped</span><span class="p">:</span>
+                    <span class="n">is_last_in_contig</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="n">end_1</span><span class="p">,</span> <span class="n">start_2</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> and </span><span class="si">{}</span><span class="s1"> cannot be concatenated as there is &#39;</span> <span class="o">+</span> \
+                        <span class="s1">&#39;no overlap and they do not abut.&#39;</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">end_1</span><span class="p">,</span> <span class="n">start_2</span><span class="p">,</span> <span class="n">heuristic</span> <span class="o">=</span> \
+                            <span class="n">Sample</span><span class="o">.</span><span class="n">overlap_indices</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">heuristic</span><span class="p">:</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                <span class="s2">&quot;Used heuristic to stitch </span><span class="si">{}</span><span class="s2"> and </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                    <span class="n">s1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">s2</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+                    <span class="k">except</span> <span class="n">OverlapException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                            <span class="s2">&quot;Unhandled overlap type whilst stitching chunks.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+            <span class="k">yield</span> <span class="n">s1</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="n">start_1</span><span class="p">,</span> <span class="n">end_1</span><span class="p">)),</span> <span class="n">is_last_in_contig</span><span class="p">,</span> <span class="n">heuristic</span>
+            <span class="n">s1</span> <span class="o">=</span> <span class="n">s2</span>
+            <span class="n">start_1</span> <span class="o">=</span> <span class="n">start_2</span></div>
+
+<div class="viewcode-block" id="Sample.trim_samples_to_region"><a class="viewcode-back" href="../../medaka.html#medaka.common.Sample.trim_samples_to_region">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">trim_samples_to_region</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Trim a stream of samples to overlap exactly co-ordinates.</span>
+
+<span class="sd">        :param start: start co-ordinate.</span>
+<span class="sd">        :param end: (exclusive) end co-ordinate.</span>
+
+<span class="sd">        .. note:: the input samples are expected to be derived from the</span>
+<span class="sd">            same reference sequence. The `start` and `end` parameters</span>
+<span class="sd">            are positions in this single sequence.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="n">Sample</span><span class="o">.</span><span class="n">trim_samples</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sample</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+            <span class="c1"># there were no samples</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># trim first (other near first) sample</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">start</span><span class="p">:</span>
+                    <span class="c1"># the samples don&#39;t span to the start of the region</span>
+                    <span class="k">break</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">start</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">sample_start</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="p">,</span> <span class="n">query</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="n">sample</span> <span class="o">=</span> <span class="n">sample</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="n">sample_start</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+                <span class="c1"># originally the sample may have intersected the region, but</span>
+                <span class="c1"># after trimming the overlap between samples and removing the</span>
+                <span class="c1"># front its size could have been reduce to zero</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">sample</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                    <span class="c1"># the samples were all before the start of the region</span>
+                    <span class="k">return</span>
+
+        <span class="n">first</span> <span class="o">=</span> <span class="n">sample</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span>
+        <span class="k">if</span> <span class="n">end</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">first</span>
+            <span class="k">yield from</span> <span class="n">samples</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">sample</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">((</span><span class="n">first</span><span class="p">,</span> <span class="p">),</span> <span class="n">samples</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">end</span><span class="p">:</span>
+                    <span class="n">sample_end</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">searchsorted</span><span class="p">(</span>
+                        <span class="n">sample</span><span class="o">.</span><span class="n">positions</span><span class="p">[</span><span class="s1">&#39;major&#39;</span><span class="p">],</span> <span class="n">end</span><span class="p">)</span>
+                    <span class="k">yield</span> <span class="p">(</span>
+                        <span class="n">sample</span><span class="o">.</span><span class="n">slice</span><span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_end</span><span class="p">)),</span>
+                        <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span><span class="p">)</span>
+                    <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="n">sample</span><span class="p">,</span> <span class="n">last</span><span class="p">,</span> <span class="n">heuristic</span></div></div>
+
+
+<span class="c1"># provide read only access to key region attrs</span>
+<span class="n">_Region</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;Region&#39;</span><span class="p">,</span> <span class="s1">&#39;ref_name start end&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Region"><a class="viewcode-back" href="../../medaka.html#medaka.common.Region">[docs]</a><span class="k">class</span> <span class="nc">Region</span><span class="p">(</span><span class="n">_Region</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Represents a genomic region.&quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Samtools-style region string, zero-base end exclusive.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return string representation of region.&quot;&quot;&quot;</span>
+        <span class="c1"># This will be zero-based, end exclusive</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">-</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return size of region.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span>
+
+<div class="viewcode-block" id="Region.from_string"><a class="viewcode-back" href="../../medaka.html#medaka.common.Region.from_string">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">region</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse region string into `Region` objects.</span>
+
+<span class="sd">        :param region: region str</span>
+
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;Ecoli&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;Ecoli&#39;, start=None, end=None)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;Ecoli:1000-2000&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;Ecoli&#39;, start=1000, end=2000)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;Ecoli:1000&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;Ecoli&#39;, start=1000, end=None)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;Ecoli:-1000&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;Ecoli&#39;, start=0, end=1000)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;Ecoli:500-&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;Ecoli&#39;, start=500, end=None)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; Region.from_string(&#39;A:B:c:500-&#39;) == Region(</span>
+<span class="sd">        ...     ref_name=&#39;A:B:c&#39;, start=500, end=None)</span>
+<span class="sd">        True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s1">&#39;:&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">region</span><span class="p">:</span>
+            <span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">region</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+            <span class="n">ref_name</span><span class="p">,</span> <span class="n">bounds</span> <span class="o">=</span> <span class="n">region</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s1">&#39;:&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;-&#39;</span><span class="p">:</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bounds</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="s1">&#39;-&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bounds</span><span class="p">:</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bounds</span><span class="p">)</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">elif</span> <span class="n">bounds</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;-&#39;</span><span class="p">:</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bounds</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bounds</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Region.split"><a class="viewcode-back" href="../../medaka.html#medaka.common.Region.split">[docs]</a>    <span class="k">def</span> <span class="nf">split</span><span class="p">(</span><span class="n">region</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">fixed_size</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Split region into sub-regions of a given length.</span>
+
+<span class="sd">        :param size: size of sub-regions.</span>
+<span class="sd">        :param overlap: overlap between ends of sub-regions.</span>
+<span class="sd">        :param fixed_size: ensure all sub-regions are equal in size. If `False`</span>
+<span class="sd">            then the final chunk will be created as the smallest size to</span>
+<span class="sd">            conform with `overlap`.</span>
+
+<span class="sd">        :returns: a list of sub-regions.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">regions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">size</span> <span class="o">&gt;=</span> <span class="n">region</span><span class="o">.</span><span class="n">size</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">region</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">region</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">region</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">size</span> <span class="o">-</span> <span class="n">overlap</span><span class="p">):</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">start</span> <span class="o">+</span> <span class="n">size</span><span class="p">,</span> <span class="n">region</span><span class="o">.</span><span class="n">end</span><span class="p">)</span>
+            <span class="n">regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Region</span><span class="p">(</span><span class="n">region</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">regions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">fixed_size</span> <span class="ow">and</span> <span class="n">regions</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">size</span> <span class="o">&lt;</span> <span class="n">size</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">regions</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">end</span> <span class="o">=</span> <span class="n">region</span><span class="o">.</span><span class="n">end</span>
+                <span class="n">start</span> <span class="o">=</span> <span class="n">end</span> <span class="o">-</span> <span class="n">size</span>
+                <span class="k">if</span> <span class="n">start</span> <span class="o">&gt;</span> <span class="n">regions</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">start</span><span class="p">:</span>
+                    <span class="n">regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Region</span><span class="p">(</span><span class="n">region</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">regions</span></div>
+
+<div class="viewcode-block" id="Region.overlaps"><a class="viewcode-back" href="../../medaka.html#medaka.common.Region.overlaps">[docs]</a>    <span class="k">def</span> <span class="nf">overlaps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Determine if a region overlaps another.</span>
+
+<span class="sd">        :param other: a second Region to test overlap.</span>
+
+<span class="sd">        :returns: True if regions overlap.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_name</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">ref_name</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">def</span> <span class="nf">_limits</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+            <span class="n">x0</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">start</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">x1</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">end</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">end</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">x0</span><span class="p">,</span> <span class="n">x1</span>
+
+        <span class="n">a0</span><span class="p">,</span> <span class="n">a1</span> <span class="o">=</span> <span class="n">_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="n">b0</span><span class="p">,</span> <span class="n">b1</span> <span class="o">=</span> <span class="n">_limits</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">a0</span> <span class="o">&lt;</span> <span class="n">b1</span> <span class="ow">and</span> <span class="n">a1</span> <span class="o">&gt;</span> <span class="n">b0</span><span class="p">)</span> <span class="ow">or</span>
+            <span class="p">(</span><span class="n">b0</span> <span class="o">&lt;</span> <span class="n">a1</span> <span class="ow">and</span> <span class="n">b1</span> <span class="o">&gt;</span> <span class="n">a0</span><span class="p">))</span></div></div>
+
+
+<div class="viewcode-block" id="get_bam_regions"><a class="viewcode-back" href="../../medaka.html#medaka.common.get_bam_regions">[docs]</a><span class="k">def</span> <span class="nf">get_bam_regions</span><span class="p">(</span><span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get regions from a bam.</span>
+
+<span class="sd">    Region start and end will be set to an integer value.</span>
+
+<span class="sd">    :param bam: `.bam` file.</span>
+<span class="sd">    :param regions: iterable of `medaka.common.Region` objs</span>
+
+<span class="sd">    :returns: list of `Region` objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span><span class="n">bam</span><span class="p">)</span> <span class="k">as</span> <span class="n">bam_fh</span><span class="p">:</span>
+        <span class="n">ref_lengths</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">bam_fh</span><span class="o">.</span><span class="n">references</span><span class="p">,</span> <span class="n">bam_fh</span><span class="o">.</span><span class="n">lengths</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">regions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">new_regions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">ref_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ref_lengths</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Contig </span><span class="si">{}</span><span class="s1"> is not one of the bam references.&#39;</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">ref_name</span><span class="p">))</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">start</span><span class="p">)</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">rl</span> <span class="o">=</span> <span class="n">ref_lengths</span><span class="p">[</span><span class="n">r</span><span class="o">.</span><span class="n">ref_name</span><span class="p">]</span>
+            <span class="n">end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="n">rl</span><span class="p">)</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">end</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">rl</span>
+            <span class="n">new_regions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Region</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">ref_name</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">new_regions</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">Region</span><span class="p">(</span><span class="n">ref_name</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">ref_name</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="n">ref_lengths</span><span class="o">.</span><span class="n">items</span><span class="p">()]</span>
+
+    <span class="k">return</span> <span class="n">new_regions</span></div>
+
+
+<div class="viewcode-block" id="ref_name_from_region_str"><a class="viewcode-back" href="../../medaka.html#medaka.common.ref_name_from_region_str">[docs]</a><span class="k">def</span> <span class="nf">ref_name_from_region_str</span><span class="p">(</span><span class="n">region_str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse region strings, returning a list of reference names.</span>
+
+<span class="sd">    :param regions: iterable of region strings.</span>
+
+<span class="sd">    :returns: tuple of reference name str.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ref_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">Region</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="o">.</span><span class="n">ref_name</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">region_str</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">ref_names</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="sliding_window"><a class="viewcode-back" href="../../medaka.html#medaka.common.sliding_window">[docs]</a><span class="k">def</span> <span class="nf">sliding_window</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sliding window across an array.</span>
+
+<span class="sd">    :param a: input array.</span>
+<span class="sd">    :param window: window length.</span>
+<span class="sd">    :param step: step length between consecutive windows.</span>
+<span class="sd">    :param axis: axis over which to apply window.</span>
+
+<span class="sd">    :yields: windows of the input array.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">slicee</span> <span class="o">=</span> <span class="p">[</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)]</span> <span class="o">*</span> <span class="n">a</span><span class="o">.</span><span class="n">ndim</span>
+    <span class="n">end</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">-</span> <span class="n">window</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">step</span><span class="p">):</span>
+        <span class="n">end</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">window</span>
+        <span class="n">slicee</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">a</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">slicee</span><span class="p">)]</span>
+    <span class="c1"># yield the remainder with the same window size</span>
+    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">end</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">-</span> <span class="n">window</span>
+        <span class="n">slicee</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">axis</span><span class="p">])</span>
+        <span class="k">yield</span> <span class="n">a</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">slicee</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="mkdir_p"><a class="viewcode-back" href="../../medaka.html#medaka.common.mkdir_p">[docs]</a><span class="k">def</span> <span class="nf">mkdir_p</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">info</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Make a directory if it doesn&#39;t exist.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># Python &gt;2.5</span>
+        <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">errno</span> <span class="o">==</span> <span class="n">errno</span><span class="o">.</span><span class="n">EEXIST</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">info</span> <span class="o">=</span> <span class="s2">&quot; </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">info</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;The path </span><span class="si">{}</span><span class="s2"> exists.</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">info</span><span class="p">))</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span></div>
+
+
+<div class="viewcode-block" id="grouper"><a class="viewcode-back" href="../../medaka.html#medaka.common.grouper">[docs]</a><span class="k">def</span> <span class="nf">grouper</span><span class="p">(</span><span class="n">gen</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Group together elements of an iterable without padding remainder.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">gen</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">Iterator</span><span class="p">):</span>
+        <span class="n">gen</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">gen</span><span class="p">)</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">batch</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">gen</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="n">batch</span>
+                <span class="k">return</span>
+        <span class="k">yield</span> <span class="n">batch</span></div>
+
+
+<div class="viewcode-block" id="roundrobin"><a class="viewcode-back" href="../../medaka.html#medaka.common.roundrobin">[docs]</a><span class="k">def</span> <span class="nf">roundrobin</span><span class="p">(</span><span class="o">*</span><span class="n">iterables</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Take items from iterables in a round-robin.&quot;&quot;&quot;</span>
+    <span class="n">pending</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">iterables</span><span class="p">)</span>
+    <span class="n">nexts</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">it</span><span class="p">)</span><span class="o">.</span><span class="fm">__next__</span> <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="n">iterables</span><span class="p">)</span>
+    <span class="k">while</span> <span class="n">pending</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="nb">next</span> <span class="ow">in</span> <span class="n">nexts</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="nb">next</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+            <span class="n">pending</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="n">nexts</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">cycle</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">islice</span><span class="p">(</span><span class="n">nexts</span><span class="p">,</span> <span class="n">pending</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="print_data_path"><a class="viewcode-back" href="../../medaka.html#medaka.common.print_data_path">[docs]</a><span class="k">def</span> <span class="nf">print_data_path</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Print data directory containing models.&quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">resource_filename</span><span class="p">(</span><span class="n">__package__</span><span class="p">,</span> <span class="s1">&#39;data&#39;</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="get_named_logger"><a class="viewcode-back" href="../../medaka.html#medaka.common.get_named_logger">[docs]</a><span class="k">def</span> <span class="nf">get_named_logger</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create a logger with a name.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">__package__</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+    <span class="k">return</span> <span class="n">logger</span></div>
+
+
+<div class="viewcode-block" id="loose_version_sort"><a class="viewcode-back" href="../../medaka.html#medaka.common.loose_version_sort">[docs]</a><span class="k">def</span> <span class="nf">loose_version_sort</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Sort an iterable.</span>
+
+<span class="sd">    Items will be sorted with `distutils.version.LooseVersion`,</span>
+<span class="sd">    falling back to regular sort when this fails.</span>
+
+<span class="sd">    &gt;&gt;&gt; loose_version_sort([&#39;chr10&#39;, &#39;chr2&#39;, &#39;chr1&#39;])</span>
+<span class="sd">    [&#39;chr1&#39;, &#39;chr2&#39;, &#39;chr10&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; sorted([&#39;chr10&#39;, &#39;chr2&#39;, &#39;chr1&#39;])</span>
+<span class="sd">    [&#39;chr1&#39;, &#39;chr10&#39;, &#39;chr2&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; loose_version_sort([</span>
+<span class="sd">    ...     &#39;chr{}c{}&#39;.format(i,j)</span>
+<span class="sd">    ...     for i,j in itertools.product(</span>
+<span class="sd">    ...        [1, 10, 2] , [1,10,2])])  # doctest: +ELLIPSIS</span>
+<span class="sd">    [&#39;chr1c1&#39;, &#39;chr1c2&#39;, &#39;chr1c10&#39;, &#39;chr2c1&#39;, ..., &#39;chr10c2&#39;, &#39;chr10c10&#39;]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">version_sorter</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">LooseVersion</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">LooseVersion</span><span class="p">(</span><span class="n">key</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+    <span class="n">it</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">it</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">version_sorter</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">get_named_logger</span><span class="p">(</span><span class="s2">&quot;VariantSort&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Could not sort with LooseVersion&quot;</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">it</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<span class="n">comp</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="s1">&#39;T&#39;</span><span class="p">:</span> <span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">:</span> <span class="s1">&#39;G&#39;</span><span class="p">,</span> <span class="s1">&#39;G&#39;</span><span class="p">:</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;X&#39;</span><span class="p">:</span> <span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="s1">&#39;N&#39;</span><span class="p">:</span> <span class="s1">&#39;N&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;a&#39;</span><span class="p">:</span> <span class="s1">&#39;t&#39;</span><span class="p">,</span> <span class="s1">&#39;t&#39;</span><span class="p">:</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">:</span> <span class="s1">&#39;g&#39;</span><span class="p">,</span> <span class="s1">&#39;g&#39;</span><span class="p">:</span> <span class="s1">&#39;c&#39;</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="s1">&#39;n&#39;</span><span class="p">:</span> <span class="s1">&#39;n&#39;</span><span class="p">,</span>
+    <span class="c1"># &#39;-&#39;: &#39;-&#39;</span>
+<span class="p">}</span>
+<span class="n">comp_trans</span> <span class="o">=</span> <span class="nb">str</span><span class="o">.</span><span class="n">maketrans</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">comp</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">comp</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+
+<div class="viewcode-block" id="reverse_complement"><a class="viewcode-back" href="../../medaka.html#medaka.common.reverse_complement">[docs]</a><span class="k">def</span> <span class="nf">reverse_complement</span><span class="p">(</span><span class="n">seq</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Reverse complement sequence.</span>
+
+<span class="sd">    :param: input sequence string.</span>
+
+<span class="sd">    :returns: reverse-complemented string.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">seq</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">comp_trans</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="read_key_value_tsv"><a class="viewcode-back" href="../../medaka.html#medaka.common.read_key_value_tsv">[docs]</a><span class="k">def</span> <span class="nf">read_key_value_tsv</span><span class="p">(</span><span class="n">fname</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Read a dictionary from a .tsv file.</span>
+
+<span class="sd">    :param fname: a .tsv file with two columns: keys and values.</span>
+
+<span class="sd">    :returns: a dictionary.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">as_string</span> <span class="o">=</span> <span class="n">libmedaka</span><span class="o">.</span><span class="n">ffi</span><span class="o">.</span><span class="n">string</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="n">libmedaka</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">read_key_value</span><span class="p">(</span><span class="n">fname</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">text</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">as_string</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">strings</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">as_string</span><span class="p">(</span><span class="n">text</span><span class="o">.</span><span class="n">strings</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">libmedaka</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">destroy_string_set</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s1">&#39;Failed to parse </span><span class="si">{}</span><span class="s1"> as two-column .tsv file.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fname</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="initialise_alignment"><a class="viewcode-back" href="../../medaka.html#medaka.common.initialise_alignment">[docs]</a><span class="k">def</span> <span class="nf">initialise_alignment</span><span class="p">(</span>
+        <span class="n">query_name</span><span class="p">,</span> <span class="n">reference_id</span><span class="p">,</span> <span class="n">reference_start</span><span class="p">,</span>
+        <span class="n">query_sequence</span><span class="p">,</span> <span class="n">cigarstring</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">mapping_quality</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+        <span class="n">query_qualities</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create a `Pysam.AlignedSegment` object.</span>
+
+<span class="sd">    :param query_name: name of the query sequence</span>
+<span class="sd">    :param reference_id: index to the reference name</span>
+<span class="sd">    :param reference_start: 0-based index of first leftmost reference</span>
+<span class="sd">        coordinate</span>
+<span class="sd">    :param query_sequence: read sequence bases, including those soft clipped</span>
+<span class="sd">    :param cigarstring: cigar string representing the alignment of query</span>
+<span class="sd">        and reference</span>
+<span class="sd">    :param flag: bitwise flag representing some properties of the alignment</span>
+<span class="sd">        (see SAM format)</span>
+<span class="sd">    :param mapping_quality: optional quality of the mapping or query to</span>
+<span class="sd">        reference</span>
+<span class="sd">    :param query_qualities: optional base qualities of the query, including</span>
+<span class="sd">        soft-clipped ones!</span>
+
+<span class="sd">    :returns: `pysam.AlignedSegment` object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="n">a</span> <span class="o">=</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignedSegment</span><span class="p">()</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">query_name</span> <span class="o">=</span> <span class="n">query_name</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">reference_id</span> <span class="o">=</span> <span class="n">reference_id</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">reference_start</span> <span class="o">=</span> <span class="n">reference_start</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">query_sequence</span> <span class="o">=</span> <span class="n">query_sequence</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">cigarstring</span> <span class="o">=</span> <span class="n">cigarstring</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">flag</span> <span class="o">=</span> <span class="n">flag</span>
+    <span class="n">a</span><span class="o">.</span><span class="n">mapping_quality</span> <span class="o">=</span> <span class="n">mapping_quality</span>
+    <span class="k">if</span> <span class="n">query_qualities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">query_qualities</span> <span class="o">=</span> <span class="n">query_qualities</span>
+
+    <span class="k">for</span> <span class="n">tag_name</span><span class="p">,</span> <span class="n">tag_value</span> <span class="ow">in</span> <span class="n">tags</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="n">tag_name</span><span class="p">,</span> <span class="n">tag_value</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">a</span></div>
+
+
+<div class="viewcode-block" id="yield_from_bed"><a class="viewcode-back" href="../../medaka.html#medaka.common.yield_from_bed">[docs]</a><span class="k">def</span> <span class="nf">yield_from_bed</span><span class="p">(</span><span class="n">bedfile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Yield chrom, start, stop tuples from a bed file.</span>
+
+<span class="sd">    :param bedfile: str, filepath.</span>
+<span class="sd">    :yields: (str chrom, int start, int stop).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">bedfile</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">fh</span><span class="p">:</span>
+            <span class="n">split_line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">split_line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;browser&#39;</span><span class="p">,</span> <span class="s1">&#39;track&#39;</span><span class="p">}</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">split_line</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">chrom</span> <span class="o">=</span> <span class="n">split_line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">split_line</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">split_line</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+            <span class="k">yield</span> <span class="n">chrom</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span></div>
+
+
+<div class="viewcode-block" id="complement_intervaltrees"><a class="viewcode-back" href="../../medaka.html#medaka.common.complement_intervaltrees">[docs]</a><span class="k">def</span> <span class="nf">complement_intervaltrees</span><span class="p">(</span><span class="n">trees</span><span class="p">,</span> <span class="n">contig_lengths</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Complement intervals, returning intervals not present in the input trees.</span>
+
+<span class="sd">    :param trees: {str contig: `intervaltree.IntervalTree` objs}</span>
+<span class="sd">    :param contig_lengths: {str contig: int contig length}</span>
+<span class="sd">    :returns: {str contig: `intervaltree.IntervalTree` objs}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">comp</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="n">intervaltree</span><span class="o">.</span><span class="n">IntervalTree</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">contig</span><span class="p">,</span> <span class="n">length</span> <span class="ow">in</span> <span class="n">contig_lengths</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">comp</span><span class="p">[</span><span class="n">contig</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">intervaltree</span><span class="o">.</span><span class="n">Interval</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">length</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">contig</span><span class="p">,</span> <span class="n">tree</span> <span class="ow">in</span> <span class="n">trees</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">interval</span> <span class="ow">in</span> <span class="n">tree</span><span class="p">:</span>
+            <span class="n">comp</span><span class="p">[</span><span class="n">contig</span><span class="p">]</span><span class="o">.</span><span class="n">chop</span><span class="p">(</span><span class="n">interval</span><span class="o">.</span><span class="n">begin</span><span class="p">,</span> <span class="n">interval</span><span class="o">.</span><span class="n">end</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">comp</span></div>
+
+
+<div class="viewcode-block" id="write_intervaltrees_to_bed"><a class="viewcode-back" href="../../medaka.html#medaka.common.write_intervaltrees_to_bed">[docs]</a><span class="k">def</span> <span class="nf">write_intervaltrees_to_bed</span><span class="p">(</span><span class="n">trees</span><span class="p">,</span> <span class="n">outfile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Write contig intervaltrees to bed file.</span>
+
+<span class="sd">    :param trees: {str contig: `intervaltree.IntervalTree` objs}</span>
+<span class="sd">    :param outfile: str, filepath.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outfile</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">contig</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">trees</span><span class="p">):</span>
+            <span class="n">tree</span> <span class="o">=</span> <span class="n">trees</span><span class="p">[</span><span class="n">contig</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">tree</span><span class="o">.</span><span class="n">all_intervals</span><span class="p">):</span>
+                <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="se">\t</span><span class="si">{}</span><span class="se">\t</span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">contig</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">begin</span><span class="p">,</span> <span class="n">i</span><span class="o">.</span><span class="n">end</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="common_fasta_contigs"><a class="viewcode-back" href="../../medaka.html#medaka.common.common_fasta_contigs">[docs]</a><span class="k">def</span> <span class="nf">common_fasta_contigs</span><span class="p">(</span><span class="n">fastas</span><span class="p">,</span> <span class="n">contigs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get common contig names from multiple fasta files.</span>
+
+<span class="sd">    :param fastas: iterable of str of fasta filepaths.</span>
+<span class="sd">    :param contigs: iterable of str, check all fastas contain these contigs</span>
+<span class="sd">        raising a KeyError if they are not all present.</span>
+
+<span class="sd">    :returns: tuple of str, contig names.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fasta_contigs</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="p">:</span> <span class="n">pysam</span><span class="o">.</span><span class="n">FastaFile</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">references</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fastas</span><span class="p">}</span>
+    <span class="n">common</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">fasta_contigs</span><span class="p">[</span><span class="n">fastas</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fastas</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+        <span class="n">common</span> <span class="o">=</span> <span class="n">common</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">fasta_contigs</span><span class="p">[</span><span class="n">f</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">contigs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">common</span><span class="o">.</span><span class="n">issuperset</span><span class="p">(</span><span class="n">contigs</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;Contigs </span><span class="si">{}</span><span class="s1"> are not present in all fastas.&#39;</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">contigs</span><span class="p">)</span> <span class="o">-</span> <span class="n">common</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">common</span> <span class="o">=</span> <span class="n">contigs</span>
+    <span class="c1"># return contigs in same order as in first fasta</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">fasta_contigs</span><span class="p">[</span><span class="n">fastas</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">common</span><span class="p">])</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

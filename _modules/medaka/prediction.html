@@ -1,0 +1,585 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.prediction &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.prediction</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.prediction</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Inference program and ancilliary functions.&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">as_completed</span><span class="p">,</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">queue</span>
+<span class="kn">import</span> <span class="nn">threading</span>
+<span class="kn">from</span> <span class="nn">timeit</span> <span class="kn">import</span> <span class="n">default_timer</span> <span class="k">as</span> <span class="n">now</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+<span class="kn">import</span> <span class="nn">medaka.datastore</span>
+<span class="kn">import</span> <span class="nn">medaka.features</span>
+<span class="kn">import</span> <span class="nn">medaka.models</span>
+
+
+<div class="viewcode-block" id="run_prediction"><a class="viewcode-back" href="../../medaka.html#medaka.prediction.run_prediction">[docs]</a><span class="k">def</span> <span class="nf">run_prediction</span><span class="p">(</span>
+        <span class="n">output</span><span class="p">,</span> <span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">feature_encoder</span><span class="p">,</span>
+        <span class="n">chunk_len</span><span class="p">,</span> <span class="n">chunk_ovlp</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+        <span class="n">save_features</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">enable_chunking</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Inference worker.&quot;&quot;&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;PWorker&#39;</span><span class="p">)</span>
+
+    <span class="c1"># start loading data</span>
+    <span class="n">loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span>
+        <span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">batch_cache_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">feature_encoder</span><span class="o">=</span><span class="n">feature_encoder</span><span class="p">,</span>
+        <span class="n">chunk_len</span><span class="o">=</span><span class="n">chunk_len</span><span class="p">,</span> <span class="n">chunk_overlap</span><span class="o">=</span><span class="n">chunk_ovlp</span><span class="p">,</span>
+        <span class="n">enable_chunking</span><span class="o">=</span><span class="n">enable_chunking</span><span class="p">)</span>
+
+    <span class="n">total_region_mbases</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">size</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e6</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Running inference for </span><span class="si">{:.1f}</span><span class="s2">M draft bases.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">total_region_mbases</span><span class="p">))</span>
+
+    <span class="n">remainder_regions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">medaka</span><span class="o">.</span><span class="n">datastore</span><span class="o">.</span><span class="n">DataStore</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ds</span><span class="p">:</span>
+        <span class="n">mbases_done</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">cache_size_log_interval</span> <span class="o">=</span> <span class="mi">5</span>
+
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+        <span class="n">tlast</span> <span class="o">=</span> <span class="n">t0</span>
+        <span class="n">tcache</span> <span class="o">=</span> <span class="n">t0</span>
+        <span class="k">for</span> <span class="n">data</span><span class="p">,</span> <span class="n">x_data</span> <span class="ow">in</span> <span class="n">loader</span><span class="p">:</span>
+            <span class="n">class_probs</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_on_batch</span><span class="p">(</span><span class="n">x_data</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">sample</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">feat</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">class_probs</span><span class="p">,</span> <span class="n">x_data</span><span class="p">):</span>
+                <span class="c1"># write out positions and predictions for later analysis</span>
+                <span class="n">features</span> <span class="o">=</span> <span class="n">feat</span> <span class="k">if</span> <span class="n">save_features</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">new_sample</span> <span class="o">=</span> <span class="n">sample</span><span class="o">.</span><span class="n">amend</span><span class="p">(</span>
+                    <span class="n">label_probs</span><span class="o">=</span><span class="n">prob</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">)</span>
+                <span class="n">ds</span><span class="o">.</span><span class="n">write_sample</span><span class="p">(</span><span class="n">new_sample</span><span class="p">)</span>
+
+            <span class="c1"># log loading of batches</span>
+            <span class="k">if</span> <span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">tcache</span> <span class="o">&gt;</span> <span class="n">cache_size_log_interval</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Batches in cache: </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">loader</span><span class="o">.</span><span class="n">_batches</span><span class="o">.</span><span class="n">qsize</span><span class="p">()))</span>
+                <span class="n">tcache</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+            <span class="c1"># calculate bases done taking into account overlap</span>
+            <span class="n">new_bases</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">chunk_ovlp</span> <span class="o">&lt;</span> <span class="n">x</span><span class="o">.</span><span class="n">size</span><span class="p">:</span>
+                    <span class="n">new_bases</span> <span class="o">+=</span> <span class="n">x</span><span class="o">.</span><span class="n">last_pos</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="o">.</span><span class="n">_get_pos</span><span class="p">(</span><span class="n">chunk_ovlp</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">new_bases</span> <span class="o">+=</span> <span class="n">x</span><span class="o">.</span><span class="n">span</span>
+            <span class="n">mbases_done</span> <span class="o">+=</span> <span class="n">new_bases</span> <span class="o">/</span> <span class="mf">1e6</span>
+            <span class="c1"># just to avoid funny log msg...</span>
+            <span class="n">mbases_done</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">mbases_done</span><span class="p">,</span> <span class="n">total_region_mbases</span><span class="p">)</span>
+            <span class="n">t1</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">t1</span> <span class="o">-</span> <span class="n">tlast</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="n">tlast</span> <span class="o">=</span> <span class="n">t1</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{:.1%}</span><span class="s1"> Done (</span><span class="si">{:.1f}</span><span class="s1">/</span><span class="si">{:.1f}</span><span class="s1"> Mbases) in </span><span class="si">{:.1f}</span><span class="s1">s&#39;</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">mbases_done</span> <span class="o">/</span> <span class="n">total_region_mbases</span><span class="p">,</span> <span class="n">mbases_done</span><span class="p">,</span>
+                    <span class="n">total_region_mbases</span><span class="p">,</span> <span class="n">t1</span> <span class="o">-</span> <span class="n">t0</span><span class="p">))</span>
+
+    <span class="n">remainder_regions</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">remainders</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;All done, </span><span class="si">{}</span><span class="s2"> remainder regions.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">remainder_regions</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">remainder_regions</span></div>
+
+
+<div class="viewcode-block" id="predict"><a class="viewcode-back" href="../../medaka.html#medaka.prediction.predict">[docs]</a><span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Inference program.&quot;&quot;&quot;</span>
+    <span class="n">logger_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__package__</span><span class="p">)</span><span class="o">.</span><span class="n">level</span>
+    <span class="k">if</span> <span class="n">logger_level</span> <span class="o">&gt;</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TF_CPP_MIN_LOG_LEVEL&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;2&quot;</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;Predict&#39;</span><span class="p">)</span>
+
+    <span class="kn">import</span> <span class="nn">tensorflow</span> <span class="k">as</span> <span class="nn">tf</span>
+    <span class="n">tf</span><span class="o">.</span><span class="n">compat</span><span class="o">.</span><span class="n">v1</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">set_verbosity</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">compat</span><span class="o">.</span><span class="n">v1</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
+    <span class="c1"># There&#39;s not to much speed up to be had with threads. We (mostly) use</span>
+    <span class="c1"># a bidirectional GRU so its fair to set inter-operation threads to two</span>
+    <span class="c1"># (for the two directions).</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">threads</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Reducing threads to 2, anymore is a waste.&quot;</span><span class="p">)</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">threads</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">list_physical_devices</span><span class="p">(</span><span class="s1">&#39;GPU&#39;</span><span class="p">))</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;It looks like you are running medaka without a GPU &quot;</span>
+                <span class="s2">&quot;and attempted to set a high number of threads. We &quot;</span>
+                <span class="s2">&quot;have scaled this down to an optimal number. If you &quot;</span>
+                <span class="s2">&quot;wish to improve performance please see &quot;</span>
+                <span class="s2">&quot;https://nanoporetech.github.io/medaka/&quot;</span>
+                <span class="s2">&quot;installation.html#improving-parallelism.&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Setting tensorflow inter/intra-op threads to </span><span class="si">{}</span><span class="s2">/1.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">))</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TF_NUM_INTEROP_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;TF_NUM_INTRAOP_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;OMP_NUM_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># this one is for the conda builds</span>
+    <span class="c1"># These function calls seem not to work:</span>
+    <span class="c1"># tf.config.threading.set_intra_op_parallelism_threads(args.threads)</span>
+    <span class="c1"># tf.config.threading.set_inter_op_parallelism_threads(args.threads)</span>
+
+    <span class="n">bam_regions</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_bam_regions</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">regions</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Processing region(s): </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">bam_regions</span><span class="p">)))</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using model: </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+    <span class="k">with</span> <span class="n">medaka</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">open_model</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="k">as</span> <span class="n">model_store</span><span class="p">:</span>
+        <span class="n">feature_encoder</span> <span class="o">=</span> <span class="n">model_store</span><span class="o">.</span><span class="n">get_meta</span><span class="p">(</span><span class="s1">&#39;feature_encoder&#39;</span><span class="p">)</span>
+        <span class="n">model_store</span><span class="o">.</span><span class="n">copy_meta</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">)</span>
+
+        <span class="n">feature_encoder</span><span class="o">.</span><span class="n">tag_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">tag_name</span>
+        <span class="n">feature_encoder</span><span class="o">.</span><span class="n">tag_value</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">tag_value</span>
+        <span class="n">feature_encoder</span><span class="o">.</span><span class="n">tag_keep_missing</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">tag_keep_missing</span>
+        <span class="n">feature_encoder</span><span class="o">.</span><span class="n">read_group</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">RG</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tf</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">list_physical_devices</span><span class="p">(</span><span class="s1">&#39;GPU&#39;</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Found a GPU.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;If cuDNN errors are observed, try setting the environment &quot;</span>
+                <span class="s2">&quot;variable `TF_FORCE_GPU_ALLOW_GROWTH=true`. To explicitely &quot;</span>
+                <span class="s2">&quot;disable use of cuDNN use the commandline option &quot;</span>
+                <span class="s2">&quot;`--disable_cudnn. If OOM (out of memory) errors are found &quot;</span>
+                <span class="s2">&quot;please reduce batch size.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Split overly long regions to maximum size so as to not create</span>
+        <span class="c1">#   massive feature matrices</span>
+        <span class="n">MAX_REGION_SIZE</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="mf">1e6</span><span class="p">)</span>  <span class="c1"># 1Mb</span>
+        <span class="n">regions</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">bam_regions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">region</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="n">MAX_REGION_SIZE</span><span class="p">:</span>
+                <span class="c1"># chunk_ovlp is mostly used in overlapping pileups (which</span>
+                <span class="c1"># generally end up being expanded compared to the draft</span>
+                <span class="c1"># coordinate system)</span>
+                <span class="n">regs</span> <span class="o">=</span> <span class="n">region</span><span class="o">.</span><span class="n">split</span><span class="p">(</span>
+                    <span class="n">MAX_REGION_SIZE</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">chunk_ovlp</span><span class="p">,</span>
+                    <span class="n">fixed_size</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">regs</span> <span class="o">=</span> <span class="p">[</span><span class="n">region</span><span class="p">]</span>
+            <span class="n">regions</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">regs</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">{}</span><span class="s2"> long region(s) with batching.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">regions</span><span class="p">)))</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">model_store</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">time_steps</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">chunk_len</span><span class="p">)</span>
+
+        <span class="c1"># the returned regions are those where the pileup width is smaller than</span>
+        <span class="c1"># chunk_len</span>
+        <span class="n">remainder_regions</span> <span class="o">=</span> <span class="n">run_prediction</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">feature_encoder</span><span class="p">,</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">chunk_len</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">chunk_ovlp</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">save_features</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">save_features</span>
+        <span class="p">)</span>
+
+        <span class="c1"># short/remainder regions: just do things without chunking. We can do</span>
+        <span class="c1"># this here because we now have the size of all pileups (and know they</span>
+        <span class="c1"># are small).</span>
+        <span class="c1"># TODO: can we avoid calculating pileups twice whilst controlling</span>
+        <span class="c1"># memory?</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remainder_regions</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing </span><span class="si">{}</span><span class="s2"> short region(s).&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">remainder_regions</span><span class="p">)))</span>
+
+            <span class="n">model</span> <span class="o">=</span> <span class="n">model_store</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">time_steps</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">remainder_regions</span><span class="p">:</span>
+                <span class="n">new_remainders</span> <span class="o">=</span> <span class="n">run_prediction</span><span class="p">(</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="p">[</span><span class="n">region</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">model</span><span class="p">,</span>
+                    <span class="n">feature_encoder</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">.</span><span class="n">chunk_len</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">chunk_ovlp</span><span class="p">,</span>  <span class="c1"># these won&#39;t be used</span>
+                    <span class="n">batch_size</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+                    <span class="n">save_features</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">save_features</span><span class="p">,</span> <span class="n">enable_chunking</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_remainders</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># shouldn&#39;t get here</span>
+                    <span class="n">ignored</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">new_remainders</span><span class="p">]</span>
+                    <span class="n">n_ignored</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ignored</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> regions were not processed: </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">n_ignored</span><span class="p">,</span> <span class="n">ignored</span><span class="p">))</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Finished processing all regions.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">check_output</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Validating and finalising output data.&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">medaka</span><span class="o">.</span><span class="n">datastore</span><span class="o">.</span><span class="n">DataStore</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">_</span><span class="p">:</span>
+                <span class="k">pass</span></div>
+
+
+<div class="viewcode-block" id="DataLoader"><a class="viewcode-back" href="../../medaka.html#medaka.prediction.DataLoader">[docs]</a><span class="k">class</span> <span class="nc">DataLoader</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Loading of data for inference.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="n">bam</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">batch_cache_size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+            <span class="n">bam_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialise data loading.</span>
+
+<span class="sd">        Once constructed, iterating over this object will yield</span>
+<span class="sd">        tuples containing a list of `Samples`, and a stacked array</span>
+<span class="sd">        of the corresponding features.</span>
+
+<span class="sd">        :param bam: input `.bam` file.</span>
+<span class="sd">        :param regions: regions to process.</span>
+<span class="sd">        :param batch_size: number samples in an inference batch.</span>
+<span class="sd">        :param batch_cache_size: maximum number of inference batches</span>
+<span class="sd">            to preload.</span>
+<span class="sd">        :param bam_workers: number of worker threads for `.bam` reading.</span>
+<span class="sd">        :param kwargs: keyword arguments to use when creating</span>
+<span class="sd">            `features.SampleGenerator` instances.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;DLoader&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bam</span> <span class="o">=</span> <span class="n">bam</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">regions</span> <span class="o">=</span> <span class="n">regions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">=</span> <span class="n">batch_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_cache_size</span> <span class="o">=</span> <span class="n">batch_cache_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bam_workers</span> <span class="o">=</span> <span class="n">bam_workers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+
+        <span class="c1"># try to load samples for one more batch than necessary to</span>
+        <span class="c1"># maintain batch cache</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample_cache_size</span> <span class="o">=</span> <span class="p">(</span><span class="n">batch_cache_size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">batch_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_results</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_cache_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_batches</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="n">batch_cache_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remainders</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Initializing data loader&#39;</span><span class="p">)</span>
+        <span class="c1"># loading of samples from regions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_parallel</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="c1"># loading of samples into batches</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bthread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_make_batches</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bthread</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bthread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Simply return self.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__next__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Generate batches of data for inference.</span>
+
+<span class="sd">        :returns: (list of `Samples`, ndarray of stacks features).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">batch</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_batches</span><span class="o">.</span><span class="n">get_nowait</span><span class="p">()</span>
+            <span class="k">except</span> <span class="n">queue</span><span class="o">.</span><span class="n">Empty</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">batch</span> <span class="ow">is</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">StopIteration</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">batch</span>
+
+    <span class="k">def</span> <span class="nf">_fill_serial</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># process one region at a time</span>
+        <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">regions</span><span class="p">:</span>
+            <span class="n">samples</span><span class="p">,</span> <span class="n">remain</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_region</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="n">region</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">remainders</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">remain</span><span class="p">)</span>
+        <span class="c1"># signal everything has been processed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="ne">StopIteration</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_fill_parallel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># process multiple regions at a time, up to a maximum to limit memory</span>
+        <span class="c1"># use. Note that the number of workers also serves as a memory</span>
+        <span class="c1"># limit when data is being consumed as fast as it is produced.</span>
+        <span class="n">regions</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">regions</span><span class="p">)</span>
+        <span class="n">futures</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">submitted</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">t0</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+        <span class="n">cache_check_interval</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="n">min_region_cache</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bam_workers</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">submitted</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">submit_reg</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">regions</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                        <span class="k">break</span>
+                <span class="c1"># try to submit</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">futures</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Submitting </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">submit_reg</span><span class="p">))</span>
+                    <span class="n">futures</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">submit_reg</span><span class="p">)]</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_run_region</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bam</span><span class="p">,</span> <span class="n">submit_reg</span><span class="p">,</span>
+                        <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">kwargs</span><span class="p">)</span>
+                    <span class="n">submitted</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">submitted</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="c1"># try to fetch</span>
+                <span class="n">done</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">kreg</span><span class="p">,</span> <span class="n">fut</span> <span class="ow">in</span> <span class="n">futures</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">fut</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                        <span class="n">samples</span><span class="p">,</span> <span class="n">remain</span> <span class="o">=</span> <span class="n">fut</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">remainders</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">remain</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+                        <span class="n">done</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">kreg</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">kreg</span> <span class="ow">in</span> <span class="n">done</span><span class="p">:</span>
+                    <span class="k">del</span> <span class="n">futures</span><span class="p">[</span><span class="n">kreg</span><span class="p">]</span>
+                <span class="c1"># keep things flowing</span>
+                <span class="k">if</span> <span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span> <span class="o">&gt;</span> <span class="n">cache_check_interval</span><span class="p">:</span>
+                    <span class="n">t0</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">qsize</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_cache_size</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Expanding region cache from </span><span class="si">{}</span><span class="s2">,&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">qsize</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">0.9</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_cache_size</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Reducing region cache from </span><span class="si">{}</span><span class="s2">,&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span><span class="p">))</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                            <span class="n">min_region_cache</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">region_cache_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Region cache is good size.&quot;</span><span class="p">)</span>
+            <span class="c1"># collect remaining futures</span>
+            <span class="k">for</span> <span class="n">fut</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+                <span class="n">samples</span><span class="p">,</span> <span class="n">remain</span> <span class="o">=</span> <span class="n">fut</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">remainders</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">remain</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">sample</span> <span class="ow">in</span> <span class="n">samples</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+        <span class="c1"># signal everything has been processed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="ne">StopIteration</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_run_region</span><span class="p">(</span><span class="n">bam</span><span class="p">,</span> <span class="n">region</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">data_gen</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">SampleGenerator</span><span class="p">(</span>
+            <span class="n">bam</span><span class="p">,</span> <span class="n">region</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data_gen</span><span class="o">.</span><span class="n">samples</span><span class="p">,</span> <span class="n">data_gen</span><span class="o">.</span><span class="n">_quarantined</span>
+
+    <span class="k">def</span> <span class="nf">_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over items in internal network input cache.&quot;&quot;&quot;</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_results</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">queue</span><span class="o">.</span><span class="n">Empty</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="k">yield</span> <span class="n">res</span>
+
+    <span class="k">def</span> <span class="nf">_make_batches</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">grouper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_samples</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">):</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">x</span><span class="o">.</span><span class="n">features</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">data</span><span class="p">])</span>
+            <span class="c1"># remake the samples pointing their .features to view the batch,</span>
+            <span class="c1"># note this doesn&#39;t save memory because the .features are already</span>
+            <span class="c1"># views onto larger matrices from feature generation: we do this</span>
+            <span class="c1"># just so the batch matrix and sample list are tied in an obvious</span>
+            <span class="c1"># manner.</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">sample</span><span class="o">.</span><span class="n">amend</span><span class="p">(</span><span class="n">features</span><span class="o">=</span><span class="n">feat</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">feat</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">data</span><span class="p">)]</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_batches</span><span class="o">.</span><span class="n">put</span><span class="p">((</span><span class="n">data</span><span class="p">,</span> <span class="n">batch</span><span class="p">))</span>
+                <span class="k">except</span> <span class="n">queue</span><span class="o">.</span><span class="n">Full</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">break</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_batches</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="ne">StopIteration</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

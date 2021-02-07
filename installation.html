@@ -1,0 +1,416 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Getting Started &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Benchmarks" href="benchmarks.html" />
+    <link rel="prev" title="Medaka" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation-methods">Installation Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sequence-correction">Sequence correction</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#improving-parallelism">Improving parallelism</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#human-variant-calling">Human variant calling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bacterial-ploidy-1-variant-calling">Bacterial (ploidy-1) variant calling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Getting Started</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/installation.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="getting-started">
+<span id="installation"></span><h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="installation-methods">
+<h2>Installation Methods<a class="headerlink" href="#installation-methods" title="Permalink to this headline">¶</a></h2>
+<p>Medaka can be installed in one of several ways.</p>
+<p><strong>Installation with conda</strong></p>
+<p>Perhaps the simplest way to start using medaka on both Linux and MacOS is
+through conda; medaka is available via the
+<a class="reference external" href="https://anaconda.org/bioconda/medaka">bioconda</a> channel:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda create -n medaka -c conda-forge -c bioconda medaka
+</pre></div>
+</div>
+<p><strong>Installation with pip</strong></p>
+<p>Medaka can be installed using the python package manager, pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip install medaka
+</pre></div>
+</div>
+<p>On Linux platforms this will install a precompiled binary, on MacOS (and other)
+platforms this will fetch and compile a source distribution.</p>
+<p>We recommend using medaka within a virtual environment, viz.:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>virtualenv medaka --python<span class="o">=</span>python3 --prompt <span class="s2">&quot;(medaka) &quot;</span>
+. medaka/bin/activate
+pip install medaka
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Using this method requires the user to provide several binaries:</p>
+<p><a class="reference external" href="https://github.com/samtools/samtools">samtools</a>,
+<a class="reference external" href="https://github.com/lh3/minimap2">minimap2</a>,
+<a class="reference external" href="https://github.com/samtools/htslib">tabix</a>,
+<a class="reference external" href="https://github.com/samtools/htslib">bgzip</a>, and
+<a class="reference external" href="https://github.com/samtools/bcftools">bcftools</a>,</p>
+<p>and place these within the <cite>PATH</cite>. <cite>samtools</cite> version 1.9, <cite>bcftools</cite> version 1.10.2 and <cite>minimap2</cite>
+version 2.17 are recommended as these are those used in development of
+medaka.</p>
+</div>
+<p><strong>Installation from source</strong></p>
+<p>Medaka can be installed from its source quite easily on most systems.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Before installing medaka it may be required to install some
+prerequisite libraries, best installed by a package manager. On Ubuntu
+theses are:</p>
+<p>bzip2 g++ zlib1g-dev libbz2-dev liblzma-dev libffi-dev libncurses5-dev
+libcurl4-gnutls-dev libssl-dev curl make cmake wget python3-all-dev python-virtualenv</p>
+</div>
+<p>A Makefile is provided to fetch, compile and install all direct dependencies
+into a python virtual environment. To setup the environment run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Note: certain files are stored in git-lfs, https://git-lfs.github.com/,</span>
+<span class="c1">#       which must therefore be installed first.</span>
+git clone https://github.com/nanoporetech/medaka.git
+<span class="nb">cd</span> medaka
+make install
+. ./venv/bin/activate
+</pre></div>
+</div>
+<p>Using this method both <code class="docutils literal notranslate"><span class="pre">samtools</span></code> and <code class="docutils literal notranslate"><span class="pre">minimap2</span></code> are built from source and need
+not be provided by the user.</p>
+<p><strong>Using a GPU</strong></p>
+<p>Since version 1.1.0 <code class="docutils literal notranslate"><span class="pre">medaka</span></code> uses Tensorflow 2.2, prior versions used Tensorflow 1.4.
+For <code class="docutils literal notranslate"><span class="pre">medaka</span></code> 1.1.0 and higher installation from source or using <code class="docutils literal notranslate"><span class="pre">pip</span></code> can make
+immediate use of GPUs. However, note that the <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> package is compiled against
+specific versions of the NVIDIA CUDA and cuDNN libraries; users are directed to the
+<a class="reference external" href="https://www.tensorflow.org/install/gpu">tensorflow installation</a>) pages
+for further information. cuDNN can be obtained from the
+<a class="reference external" href="https://developer.nvidia.com/rdp/cudnn-archive">cuDNN Archive</a>, whilst CUDA
+from the <cite>CUDA Toolkit Archive &lt;https://developer.nvidia.com/cuda-toolkit-archive&gt;</cite>.</p>
+<p>For <code class="docutils literal notranslate"><span class="pre">medaka</span></code> prior to version 1.1.0, to enable the use of GPU resource it is
+necessary to install the <code class="docutils literal notranslate"><span class="pre">tensorflow-gpu</span></code> package. Using the source code from github
+a working GPU-powered <code class="docutils literal notranslate"><span class="pre">medaka</span></code> can be configured with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/nanoporetech/medaka.git
+<span class="nb">cd</span> medaka
+sed -i <span class="s1">&#39;s/tensorflow/tensorflow-gpu/&#39;</span> requirements.txt
+make install
+</pre></div>
+</div>
+<p><em>GPU usage notes:</em></p>
+<p>Depending on your GPU, <code class="docutils literal notranslate"><span class="pre">medaka</span></code> may show out of memory errors when running.
+To avoid these the inference batch size can be reduced from the default
+value by setting the <code class="docutils literal notranslate"><span class="pre">-b</span></code> option when running <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code>. A value
+<code class="docutils literal notranslate"><span class="pre">-b</span> <span class="pre">100</span></code> is suitable for 11Gb GPUs.</p>
+<p>For users with RTX series GPUs it may be required to additionally set an
+environment variable to have <code class="docutils literal notranslate"><span class="pre">medaka</span></code> run without failure:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">TF_FORCE_GPU_ALLOW_GROWTH</span><span class="o">=</span><span class="nb">true</span>
+</pre></div>
+</div>
+<p>In this situation a further reduction in batch size may be required.</p>
+</div>
+<div class="section" id="sequence-correction">
+<span id="id1"></span><h2>Sequence correction<a class="headerlink" href="#sequence-correction" title="Permalink to this headline">¶</a></h2>
+<p>After installing the software (see <a class="reference internal" href="#installation"><span class="std std-ref">Getting Started</span></a>), <cite>medaka</cite> can be run
+using its default settings through the <cite>medaka_consensus</cite> program. An
+assembly in <cite>.fasta</cite> format and basecalls in <cite>.fasta</cite> or <cite>.fastq</cite> format are
+required (see <a class="reference internal" href="walkthrough.html#basecalling-and-draft-assembly"><span class="std std-ref">Creating a Draft Assembly</span></a> for an detailed example
+of one method of obtaining these). More details and background can be found in
+<a class="reference internal" href="draft_origin.html#draftorigin"><span class="std std-ref">Origin of the draft sequence</span></a>.</p>
+<p>The program uses both <cite>samtools</cite> and <cite>minimap2</cite>.
+If medaka has been installed using the from-source method these will be present
+within the medaka environment, else they will need to be provided by the user.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span> <span class="si">${</span><span class="nv">MEDAKA</span><span class="si">}</span>  <span class="c1"># i.e. medaka/venv/bin/activate</span>
+<span class="nv">NPROC</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
+<span class="nv">BASECALLS</span><span class="o">=</span>basecalls.fa
+<span class="nv">DRAFT</span><span class="o">=</span>draft_assm/assm_final.fa
+<span class="nv">OUTDIR</span><span class="o">=</span>medaka_consensus
+medaka_consensus -i <span class="si">${</span><span class="nv">BASECALLS</span><span class="si">}</span> -d <span class="si">${</span><span class="nv">DRAFT</span><span class="si">}</span> -o <span class="si">${</span><span class="nv">OUTDIR</span><span class="si">}</span> -t <span class="si">${</span><span class="nv">NPROC</span><span class="si">}</span> -m r941_min_fast_g330
+</pre></div>
+</div>
+<p>The variables <code class="docutils literal notranslate"><span class="pre">BASECALLS</span></code>, <code class="docutils literal notranslate"><span class="pre">DRAFT</span></code>, and <code class="docutils literal notranslate"><span class="pre">OUTDIR</span></code> in the above should be set
+appropriately. When <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code> has finished running, the consensus
+will be saved to <code class="docutils literal notranslate"><span class="pre">${OUTDIR}/consensus.fasta</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>For best results it is important to specify the correct model, <code class="docutils literal notranslate"><span class="pre">-m</span></code> in the
+above, according to the basecaller used. Allowed values can be found by
+running <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">tools</span> <span class="pre">list_models</span></code>.</p>
+</div>
+<p>Medaka models are named to indicate i) the pore type, ii) the sequencing
+device (MinION or PromethION), iii) the basecaller variant, and iv) the
+basecaller version:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">{</span>pore<span class="o">}</span>_<span class="o">{</span>device<span class="o">}</span>_<span class="o">{</span><span class="nb">caller</span> variant<span class="o">}</span>_<span class="o">{</span><span class="nb">caller</span> version<span class="o">}</span>
+</pre></div>
+</div>
+<p>For example the model named <code class="docutils literal notranslate"><span class="pre">r941_min_fast_g303</span></code> should be used with data from
+MinION (or GridION) R9.4.1 flowcells using the fast Guppy basecaller version
+3.0.3. By contrast the model <code class="docutils literal notranslate"><span class="pre">r941_prom_hac_g303</span></code> should be used with PromethION
+data and the high accuracy basecaller (termed “hac” in Guppy configuration
+files). Where a version of Guppy has been used without an exactly corresponding
+medaka model, the medaka model with the highest version equal to or less than
+the guppy version should be selected.</p>
+<div class="section" id="improving-parallelism">
+<h3>Improving parallelism<a class="headerlink" href="#improving-parallelism" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code> program is good for simple datasets but perhaps not
+optimal for running large datasets at scale. examples. A higher level of
+parallelism can be achieved by running independently the component steps
+of <code class="docutils literal notranslate"><span class="pre">medaka_consensus</span></code>. The program performs three tasks:</p>
+<ol class="arabic simple">
+<li><p>alignment or reads to input assembly (via <code class="docutils literal notranslate"><span class="pre">mini_align</span></code> which is a thin
+veil over <code class="docutils literal notranslate"><span class="pre">minimap2</span></code>)</p></li>
+<li><p>running of consensus algorithm across assembly regions
+(<code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span></code>, note no underscore!)</p></li>
+<li><p>aggregation of the results of 2. to create consensus sequences
+(<code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">stitch</span></code>)</p></li>
+</ol>
+<p>The three steps are discrete, and can be split apart an run independently. In
+most cases, Step 2. is the bottleneck and can be trivially parallelized. The
+<code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span> <span class="pre">program</span></code> can be supplied a <code class="docutils literal notranslate"><span class="pre">--regions</span></code>
+argument which will restrict its action to particular assembly sequences from
+the <code class="docutils literal notranslate"><span class="pre">.bam</span></code> file output in Step 1. Therefore individual jobs can be run for batches
+of assembly sequences simultaneously. In the final step, <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">stitch</span></code>
+can take as input one or more of the <code class="docutils literal notranslate"><span class="pre">.hdf</span></code> files output by Step 2.</p>
+<p>So in summary something like this is possible:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># align reads to assembly</span>
+mini_align -i basecalls.fasta -r assembly.fasta -P -m <span class="se">\</span>
+    -p calls_to_draft.bam -t &lt;threads&gt;
+<span class="c1"># run lots of jobs like this, change model as appropriate</span>
+mkdir results
+medaka consensus calls_to_draft.bam results/contigs1-4.hdf <span class="se">\</span>
+    --model r941_min_fast_g303 --batch <span class="m">200</span> --threads <span class="m">8</span> <span class="se">\</span>
+    --region contig1 contig2 contig3 contig4
+...
+<span class="c1"># wait for jobs, then collate results</span>
+medaka stitch results/*.hdf polished.assembly.fasta
+</pre></div>
+</div>
+<p>It is not recommended to specify a value of <code class="docutils literal notranslate"><span class="pre">--threads</span></code> greater than 8 for
+<code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span></code> since the compute scaling efficiency is poor beyond this.
+Note also that <code class="docutils literal notranslate"><span class="pre">medaka</span> <span class="pre">consensus</span></code> may been seen to use resource equivalent to
+<code class="docutils literal notranslate"><span class="pre">&lt;threads&gt;</span> <span class="pre">+</span> <span class="pre">4</span></code> as an additional 4 threads are used for reading and preparing
+input data.</p>
+</div>
+</div>
+<div class="section" id="human-variant-calling">
+<h2>Human variant calling<a class="headerlink" href="#human-variant-calling" title="Permalink to this headline">¶</a></h2>
+<p>Variant calling on human samples can be performed with the <cite>medaka_variant</cite> workflow:</p>
+<blockquote>
+<div><p>medaka_variant -f &lt;REFERENCE.fasta&gt; -b &lt;reads.bam&gt;</p>
+</div></blockquote>
+<p>which requires simply a path to the human reference sequence, and a <cite>.bam</cite> file
+of reads aligned to the reference.</p>
+</div>
+<div class="section" id="bacterial-ploidy-1-variant-calling">
+<h2>Bacterial (ploidy-1) variant calling<a class="headerlink" href="#bacterial-ploidy-1-variant-calling" title="Permalink to this headline">¶</a></h2>
+<p>Variant calling for monoploid samples is enabled through the <cite>medaka_haploid_variant</cite>
+workflow:</p>
+<blockquote>
+<div><p>medaka_haploid_variant &lt;reads.fastq&gt; &lt;ref.fasta&gt;</p>
+</div></blockquote>
+<p>which requires the reads as a <cite>.fasta</cite> or <cite>.fastq</cite> and a reference sequence as a
+<cite>.fasta</cite> file.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="benchmarks.html" class="btn btn-neutral float-right" title="Benchmarks" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Medaka" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

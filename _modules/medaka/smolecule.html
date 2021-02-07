@@ -1,0 +1,668 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>medaka.smolecule &mdash; Medaka 1.2.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> Medaka
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.2.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../benchmarks.html">Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../snp.html">Human Variant Calling Benchmarks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../walkthrough.html">Walkthrough</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../draft_origin.html">Origin of the draft sequence</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../development.html">Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../future.html">History and Future Directions</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Medaka</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+          <li><a href="../medaka.html">medaka</a> &raquo;</li>
+        
+      <li>medaka.smolecule</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for medaka.smolecule</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Creation of consensus sequences from repetitive reads.&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">as_completed</span><span class="p">,</span> <span class="n">ProcessPoolExecutor</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">timeit</span> <span class="kn">import</span> <span class="n">default_timer</span> <span class="k">as</span> <span class="n">now</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">mappy</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">parasail</span>
+<span class="kn">import</span> <span class="nn">pysam</span>
+<span class="kn">import</span> <span class="nn">spoa</span>
+
+<span class="kn">import</span> <span class="nn">medaka.align</span>
+<span class="kn">import</span> <span class="nn">medaka.common</span>
+
+<span class="n">Subread</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;Subread&#39;</span><span class="p">,</span> <span class="s1">&#39;name seq&#39;</span><span class="p">)</span>
+<span class="n">Alignment</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;Alignment&#39;</span><span class="p">,</span> <span class="s1">&#39;rname qname flag rstart seq cigar&#39;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Read"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read">[docs]</a><span class="k">class</span> <span class="nc">Read</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Functionality to extract information from a read with subreads.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">subreads</span><span class="p">,</span> <span class="n">initialize</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize repeat read analysis.</span>
+
+<span class="sd">        :param name: read name.</span>
+<span class="sd">        :param subreads: list of subreads.</span>
+<span class="sd">        :param initialize: initialize subread alignments.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span> <span class="o">=</span> <span class="n">subreads</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot create a read with fewer than 0 subreads.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">seq</span>
+        <span class="c1"># SW alignments of subreads to consensus</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_alignments</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_alignments_valid</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># orientation of subreads wrt consensus</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_orient</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># has initialize() been run (i.e. are the above filled in)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_initialized</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># has a consensus been run</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">consensus_run</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="Read.initialize"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.initialize">[docs]</a>    <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Calculate initial alignments of subreads to scaffold read.&quot;&quot;&quot;</span>
+        <span class="c1"># we find initial alignments with parasail as mappy may not find some</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initialized</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_alignments</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orient_subreads</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_alignments_valid</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_initialized</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Read.from_fastx"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.from_fastx">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_fastx</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">fastx</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a Read from a fasta/q file.</span>
+
+<span class="sd">        :param fastx: input file path.</span>
+<span class="sd">        :param name: name of Read. If not given the filename will be used.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">read</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">multi_from_fastx</span><span class="p">(</span><span class="n">fastx</span><span class="p">,</span> <span class="n">take_all</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IOError</span><span class="p">(</span><span class="s2">&quot;Could not create Read from file </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">fastx</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">read</span></div>
+
+<div class="viewcode-block" id="Read.multi_from_fastx"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.multi_from_fastx">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">multi_from_fastx</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">fastx</span><span class="p">,</span>
+                         <span class="n">take_all</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">read_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">depth_filter</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">length_filter</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create multiple `Read` s from a fasta/q file.</span>
+
+<span class="sd">        It is assumed that subreads are grouped by read and named with</span>
+<span class="sd">        &lt;read_id&gt;_&lt;subread_id&gt;.</span>
+
+<span class="sd">        :param fastx: input file path.</span>
+<span class="sd">        :param take_all: skip check on subread_ids, take all subreads in one</span>
+<span class="sd">            `Read`.</span>
+<span class="sd">        :param read_id: name of `Read`. Only used for `take_all == True`. If</span>
+<span class="sd">            not given the basename of the input file is used.</span>
+<span class="sd">        :param depth_filter: require reads to have at least this many subreads.</span>
+<span class="sd">        :param length_filter: require reads to have a median subread length</span>
+<span class="sd">            above this value.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">depth_filter</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">depth_filter</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">take_all</span> <span class="ow">and</span> <span class="n">read_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">read_id</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">fastx</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">read_id</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">subreads</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">FastxFile</span><span class="p">(</span><span class="n">fastx</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">take_all</span><span class="p">:</span>
+                    <span class="n">cur_read_id</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">cur_read_id</span> <span class="o">!=</span> <span class="n">read_id</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subreads</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">depth_filter</span><span class="p">:</span>
+                            <span class="n">med_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span>
+                                <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">subreads</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="n">med_length</span> <span class="o">&gt;</span> <span class="n">length_filter</span><span class="p">:</span>
+                                <span class="k">yield</span> <span class="bp">cls</span><span class="p">(</span><span class="n">read_id</span><span class="p">,</span> <span class="n">subreads</span><span class="p">)</span>
+                        <span class="n">read_id</span> <span class="o">=</span> <span class="n">cur_read_id</span>
+                        <span class="n">subreads</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">sequence</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">subreads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Subread</span><span class="p">(</span><span class="n">entry</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">entry</span><span class="o">.</span><span class="n">sequence</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subreads</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">depth_filter</span><span class="p">:</span>
+                <span class="n">med_length</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">subreads</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">med_length</span> <span class="o">&gt;</span> <span class="n">length_filter</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="bp">cls</span><span class="p">(</span><span class="n">read_id</span><span class="p">,</span> <span class="n">subreads</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">seqs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a list of the subread sequences.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">seq</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">interleaved_subreads</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return a list of subreads with + and - reads interleaved.</span>
+
+<span class="sd">        :returns: orientations, subreads.</span>
+
+<span class="sd">        The ordering may not be strictly +-+-+-..., the subreads</span>
+<span class="sd">        are positioned such that + and - reads are both distributed</span>
+<span class="sd">        uniformally through the list (according to their overall</span>
+<span class="sd">        frequency).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+        <span class="n">fwd</span><span class="p">,</span> <span class="n">rev</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(),</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">orient</span><span class="p">,</span> <span class="n">subread</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_orient</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">orient</span><span class="p">:</span>
+                <span class="n">fwd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">subread</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">rev</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">subread</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">reads</span> <span class="ow">in</span> <span class="n">fwd</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">reads</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">rate</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">reads</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">reads</span><span class="p">)):</span>
+                    <span class="n">reads</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">rate</span> <span class="o">*</span> <span class="n">i</span>
+        <span class="n">reads</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">fwd</span> <span class="o">+</span> <span class="n">rev</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+        <span class="n">reads</span><span class="p">,</span> <span class="n">orients</span><span class="p">,</span> <span class="n">garbage</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">reads</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">orients</span><span class="p">,</span> <span class="n">reads</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">nseqs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return the number of subreads contained in the read.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Read.poa_consensus"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.poa_consensus">[docs]</a>    <span class="k">def</span> <span class="nf">poa_consensus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">additional_seq</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;spoa&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a consensus sequence for the read.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;spoa&#39;</span><span class="p">:</span>
+            <span class="n">seqs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">orient</span><span class="p">,</span> <span class="n">subread</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">interleaved_subreads</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">orient</span><span class="p">:</span>
+                    <span class="n">seq</span> <span class="o">=</span> <span class="n">subread</span><span class="o">.</span><span class="n">seq</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">seq</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">reverse_complement</span><span class="p">(</span><span class="n">subread</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
+                <span class="n">seqs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seq</span><span class="p">)</span>
+            <span class="n">consensus_seq</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">spoa</span><span class="o">.</span><span class="n">poa</span><span class="p">(</span><span class="n">seqs</span><span class="p">,</span> <span class="n">genmsa</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s1">&#39;racon&#39;</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span>
+                    <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s1">&#39;.fasta&#39;</span><span class="p">,</span> <span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">additional_seq</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;&gt;</span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;additional&#39;</span><span class="p">,</span> <span class="n">additional_seq</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">orient</span><span class="p">,</span> <span class="n">subread</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_orient</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">):</span>
+                    <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;&gt;</span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">subread</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">subread</span><span class="o">.</span><span class="n">seq</span><span class="p">))</span>
+                <span class="n">fh</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+                <span class="n">consensus_seq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_racon</span><span class="p">(</span><span class="n">fh</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Unrecognised method: </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">method</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span> <span class="o">=</span> <span class="n">consensus_seq</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_alignments_valid</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">consensus_run</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">consensus_seq</span></div>
+
+    <span class="k">def</span> <span class="nf">_run_racon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fasta</span><span class="p">):</span>
+        <span class="n">tname</span> <span class="o">=</span> <span class="s1">&#39;consensus_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">header</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;HD&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;VN&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span>
+            <span class="s1">&#39;SQ&#39;</span><span class="p">:</span> <span class="p">[{</span>
+                <span class="s1">&#39;LN&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">consensus</span><span class="p">),</span>
+                <span class="s1">&#39;SN&#39;</span><span class="p">:</span> <span class="n">tname</span><span class="p">,</span>
+            <span class="p">}]</span>
+        <span class="p">}</span>
+        <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
+            <span class="n">ref_fasta</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s1">&#39;racon_ref.fasta&#39;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">ref_fasta</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+                <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;&gt;</span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tname</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span><span class="p">))</span>
+
+            <span class="n">overlaps</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s1">&#39;racon_in.sam&#39;</span><span class="p">)</span>
+            <span class="n">write_bam</span><span class="p">(</span><span class="n">overlaps</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_alignments</span><span class="p">],</span> <span class="n">header</span><span class="p">,</span> <span class="n">bam</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+            <span class="n">opts</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-m&#39;</span><span class="p">,</span> <span class="s1">&#39;8&#39;</span><span class="p">,</span> <span class="s1">&#39;-x&#39;</span><span class="p">,</span> <span class="s1">&#39;-6&#39;</span><span class="p">,</span> <span class="s1">&#39;-g&#39;</span><span class="p">,</span> <span class="s1">&#39;-8&#39;</span><span class="p">]</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span>
+                    <span class="p">[</span><span class="s1">&#39;racon&#39;</span><span class="p">,</span> <span class="n">fasta</span><span class="p">,</span> <span class="n">overlaps</span><span class="p">,</span> <span class="n">ref_fasta</span><span class="p">]</span> <span class="o">+</span> <span class="n">opts</span><span class="p">,</span>
+                    <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;RACON FAILED&quot;</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">cmd</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">stderr</span><span class="p">]))</span>
+                <span class="n">racon_seq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">racon_seq</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">racon_seq</span>
+
+<div class="viewcode-block" id="Read.orient_subreads"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.orient_subreads">[docs]</a>    <span class="k">def</span> <span class="nf">orient_subreads</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Find orientation of subreads with respect to consensus sequence.</span>
+
+<span class="sd">        :returns: `medaka.align.Alignment` s of subreads to consensus.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: use a profile here</span>
+        <span class="c1"># TODO: refactor with align_to_template</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_orient</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">alignments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">:</span>
+            <span class="n">rc_seq</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">reverse_complement</span><span class="p">(</span><span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
+            <span class="n">result_fwd</span> <span class="o">=</span> <span class="n">parasail</span><span class="o">.</span><span class="n">sw_trace_striped_16</span><span class="p">(</span>
+                <span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">parasail</span><span class="o">.</span><span class="n">dnafull</span><span class="p">)</span>
+            <span class="n">result_rev</span> <span class="o">=</span> <span class="n">parasail</span><span class="o">.</span><span class="n">sw_trace_striped_16</span><span class="p">(</span>
+                <span class="n">rc_seq</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">consensus</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">parasail</span><span class="o">.</span><span class="n">dnafull</span><span class="p">)</span>
+            <span class="n">is_fwd</span> <span class="o">=</span> <span class="n">result_fwd</span><span class="o">.</span><span class="n">score</span> <span class="o">&gt;</span> <span class="n">result_rev</span><span class="o">.</span><span class="n">score</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_orient</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">is_fwd</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">result_fwd</span> <span class="k">if</span> <span class="n">is_fwd</span> <span class="k">else</span> <span class="n">result_rev</span>
+            <span class="n">seq</span> <span class="o">=</span> <span class="n">sr</span><span class="o">.</span><span class="n">seq</span> <span class="k">if</span> <span class="n">is_fwd</span> <span class="k">else</span> <span class="n">rc_seq</span>
+            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_ref</span> <span class="o">&gt;=</span> <span class="n">result</span><span class="o">.</span><span class="n">end_ref</span> <span class="ow">or</span> \
+                    <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_query</span> <span class="o">&gt;=</span> <span class="n">result</span><span class="o">.</span><span class="n">end_query</span><span class="p">:</span>
+                <span class="c1"># unsure why this can happen</span>
+                <span class="k">continue</span>
+            <span class="n">rstart</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">align</span><span class="o">.</span><span class="n">parasail_to_sam</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">seq</span><span class="p">)</span>
+            <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">is_fwd</span> <span class="k">else</span> <span class="mi">16</span>
+            <span class="n">aln</span> <span class="o">=</span> <span class="n">Alignment</span><span class="p">(</span>
+                <span class="s1">&#39;consensus_</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">sr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">flag</span><span class="p">,</span> <span class="n">rstart</span><span class="p">,</span> <span class="n">seq</span><span class="p">,</span> <span class="n">cigar</span><span class="p">)</span>
+            <span class="n">alignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aln</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">alignments</span></div>
+
+<div class="viewcode-block" id="Read.align_to_template"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.align_to_template">[docs]</a>    <span class="k">def</span> <span class="nf">align_to_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">template_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Align subreads to a template sequence using Smith-Waterman.</span>
+
+<span class="sd">        :param template: sequence to which to align subreads.</span>
+<span class="sd">        :param template_name: name of template sequence.</span>
+
+<span class="sd">        :returns: `Alignment` tuples.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+        <span class="n">alignments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">orient</span><span class="p">,</span> <span class="n">sr</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_orient</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">orient</span><span class="p">:</span>
+                <span class="n">seq</span> <span class="o">=</span> <span class="n">sr</span><span class="o">.</span><span class="n">seq</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">seq</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">reverse_complement</span><span class="p">(</span><span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">parasail</span><span class="o">.</span><span class="n">sw_trace_striped_16</span><span class="p">(</span>
+                <span class="n">seq</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">parasail</span><span class="o">.</span><span class="n">dnafull</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_ref</span> <span class="o">&gt;=</span> <span class="n">result</span><span class="o">.</span><span class="n">end_ref</span> <span class="ow">or</span> \
+                    <span class="n">result</span><span class="o">.</span><span class="n">cigar</span><span class="o">.</span><span class="n">beg_query</span> <span class="o">&gt;=</span> <span class="n">result</span><span class="o">.</span><span class="n">end_query</span><span class="p">:</span>
+                <span class="c1"># unsure why this can happen</span>
+                <span class="k">continue</span>
+            <span class="n">rstart</span><span class="p">,</span> <span class="n">cigar</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">align</span><span class="o">.</span><span class="n">parasail_to_sam</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">seq</span><span class="p">)</span>
+            <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">orient</span> <span class="k">else</span> <span class="mi">16</span>
+            <span class="n">aln</span> <span class="o">=</span> <span class="n">Alignment</span><span class="p">(</span><span class="n">template_name</span><span class="p">,</span> <span class="n">sr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">rstart</span><span class="p">,</span> <span class="n">seq</span><span class="p">,</span> <span class="n">cigar</span><span class="p">)</span>
+            <span class="n">alignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aln</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">alignments</span></div>
+
+<div class="viewcode-block" id="Read.mappy_to_template"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.Read.mappy_to_template">[docs]</a>    <span class="k">def</span> <span class="nf">mappy_to_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">template_name</span><span class="p">,</span> <span class="n">align</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Align subreads to a template sequence using minimap.</span>
+
+<span class="sd">        :param template: sequence to which to align subreads.</span>
+<span class="sd">        :param template_name: name of template sequence.</span>
+<span class="sd">        :param align: retrieve cigar string (else produce paf)</span>
+
+<span class="sd">        :returns: `Alignment` tuples.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">align</span><span class="p">:</span>
+            <span class="c1"># align False requires forked minimap2, and isn&#39;t much faster for</span>
+            <span class="c1"># a small number of sequences due to index construction time.</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;`align` is ignored&quot;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">)</span>
+        <span class="n">alignments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">aligner</span> <span class="o">=</span> <span class="n">mappy</span><span class="o">.</span><span class="n">Aligner</span><span class="p">(</span><span class="n">seq</span><span class="o">=</span><span class="n">template</span><span class="p">,</span> <span class="n">preset</span><span class="o">=</span><span class="s1">&#39;map-ont&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">subreads</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">hit</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">aligner</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">hit</span><span class="o">.</span><span class="n">strand</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">16</span>
+                <span class="k">if</span> <span class="n">hit</span><span class="o">.</span><span class="n">strand</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">seq</span> <span class="o">=</span> <span class="n">sr</span><span class="o">.</span><span class="n">seq</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">seq</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">reverse_complement</span><span class="p">(</span><span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span>
+                <span class="n">clip</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">S&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">(</span><span class="n">hit</span><span class="o">.</span><span class="n">q_st</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sr</span><span class="o">.</span><span class="n">seq</span><span class="p">)</span> <span class="o">-</span> <span class="n">hit</span><span class="o">.</span><span class="n">q_en</span><span class="p">)]</span>
+                <span class="k">if</span> <span class="n">hit</span><span class="o">.</span><span class="n">strand</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                    <span class="n">clip</span> <span class="o">=</span> <span class="n">clip</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">cigstr</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="n">clip</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">hit</span><span class="o">.</span><span class="n">cigar_str</span><span class="p">,</span> <span class="n">clip</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="n">aln</span> <span class="o">=</span> <span class="n">Alignment</span><span class="p">(</span>
+                    <span class="n">template_name</span><span class="p">,</span> <span class="n">sr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">flag</span><span class="p">,</span> <span class="n">hit</span><span class="o">.</span><span class="n">r_st</span><span class="p">,</span> <span class="n">seq</span><span class="p">,</span> <span class="n">cigstr</span><span class="p">)</span>
+                <span class="n">alignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aln</span><span class="p">)</span>
+                <span class="n">hit</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">alignments</span></div></div>
+
+
+<div class="viewcode-block" id="write_bam"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.write_bam">[docs]</a><span class="k">def</span> <span class="nf">write_bam</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">alignments</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">bam</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Write a `.bam` file for a set of alignments.</span>
+
+<span class="sd">    :param fname: output filename.</span>
+<span class="sd">    :param alignments: a list of `Alignment` tuples.</span>
+<span class="sd">    :param header: bam header</span>
+<span class="sd">    :param bam: write bam, else sam</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="s1">&#39;wb&#39;</span> <span class="k">if</span> <span class="n">bam</span> <span class="k">else</span> <span class="s1">&#39;w&#39;</span>
+    <span class="k">with</span> <span class="n">pysam</span><span class="o">.</span><span class="n">AlignmentFile</span><span class="p">(</span><span class="n">fname</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ref_id</span><span class="p">,</span> <span class="n">subreads</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alignments</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">aln</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">subreads</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">rstart</span><span class="p">):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">align</span><span class="o">.</span><span class="n">initialise_alignment</span><span class="p">(</span><span class="n">aln</span><span class="o">.</span><span class="n">qname</span><span class="p">,</span> <span class="n">ref_id</span><span class="p">,</span>
+                                                      <span class="n">aln</span><span class="o">.</span><span class="n">rstart</span><span class="p">,</span> <span class="n">aln</span><span class="o">.</span><span class="n">seq</span><span class="p">,</span>
+                                                      <span class="n">aln</span><span class="o">.</span><span class="n">cigar</span><span class="p">,</span> <span class="n">aln</span><span class="o">.</span><span class="n">flag</span><span class="p">)</span>
+                <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;wb&#39;</span><span class="p">:</span>
+        <span class="n">pysam</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_read_worker</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">align</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;spoa&#39;</span><span class="p">):</span>
+    <span class="n">read</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">read</span><span class="o">.</span><span class="n">nseqs</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># skip if there is only one subread</span>
+        <span class="k">for</span> <span class="n">it</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+            <span class="n">read</span><span class="o">.</span><span class="n">poa_consensus</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+    <span class="n">aligns</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">align</span><span class="p">:</span>
+        <span class="n">aligns</span> <span class="o">=</span> <span class="n">read</span><span class="o">.</span><span class="n">mappy_to_template</span><span class="p">(</span>
+            <span class="n">template</span><span class="o">=</span><span class="n">read</span><span class="o">.</span><span class="n">consensus</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="n">read</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">read</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">read</span><span class="o">.</span><span class="n">consensus</span><span class="p">,</span> <span class="n">aligns</span>
+
+
+<div class="viewcode-block" id="poa_workflow"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.poa_workflow">[docs]</a><span class="k">def</span> <span class="nf">poa_workflow</span><span class="p">(</span><span class="n">reads</span><span class="p">,</span> <span class="n">threads</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;spoa&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Worker function for processing repetitive reads.</span>
+
+<span class="sd">    :param reads: list of `Read` s.</span>
+<span class="sd">    :param threads: number of threads to use for processing.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># TODO: this is quite memory inefficient, but we can only build the header</span>
+    <span class="c1">#       by seeing everything.</span>
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;POAManager&#39;</span><span class="p">)</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">ProcessPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">threads</span><span class="p">)</span>
+    <span class="n">futures</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">read</span> <span class="ow">in</span> <span class="n">reads</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adding </span><span class="si">{}</span><span class="s2"> to queue.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">read</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+        <span class="n">futures</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">_read_worker</span><span class="p">,</span> <span class="n">read</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">))</span>
+
+    <span class="n">header</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;HD&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;VN&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">},</span>
+        <span class="s1">&#39;SQ&#39;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="p">}</span>
+    <span class="n">consensuses</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">alignments</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">fut</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">fut</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rname</span><span class="p">,</span> <span class="n">consensus</span><span class="p">,</span> <span class="n">aligns</span> <span class="o">=</span> <span class="n">res</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s1">&#39;Finished </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rname</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">consensus</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">header</span><span class="p">[</span><span class="s1">&#39;SQ&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;LN&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">consensus</span><span class="p">),</span>
+                    <span class="s1">&#39;SN&#39;</span><span class="p">:</span> <span class="n">rname</span><span class="p">,</span>
+                <span class="p">})</span>
+                <span class="n">consensuses</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">rname</span><span class="p">,</span> <span class="n">consensus</span><span class="p">])</span>
+                <span class="n">alignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">aligns</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">header</span><span class="p">,</span> <span class="n">consensuses</span><span class="p">,</span> <span class="n">alignments</span></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../medaka.html#medaka.smolecule.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Entry point for repeat read consensus creation.&quot;&quot;&quot;</span>
+    <span class="c1"># arg parser does not supply these</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">tag_name</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">tag_value</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">tag_keep_missing</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">RG</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">regions</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">draft</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">logger</span> <span class="o">=</span> <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">get_named_logger</span><span class="p">(</span><span class="s1">&#39;Smolecule&#39;</span><span class="p">)</span>
+    <span class="n">medaka</span><span class="o">.</span><span class="n">common</span><span class="o">.</span><span class="n">mkdir_p</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">info</span><span class="o">=</span><span class="s1">&#39;Results will be overwritten.&#39;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_multi_file_reader</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">fname</span> <span class="ow">in</span> <span class="n">args</span><span class="o">.</span><span class="n">fasta</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">Read</span><span class="o">.</span><span class="n">from_fastx</span><span class="p">(</span><span class="n">fname</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">fasta</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Given </span><span class="si">{}</span><span class="s2"> input files, assuming one read per file.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">fasta</span><span class="p">)))</span>
+        <span class="n">reads</span> <span class="o">=</span> <span class="n">_multi_file_reader</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Given one input file, subreads are assumed &quot;</span>
+            <span class="s2">&quot;to be grouped by read.&quot;</span><span class="p">)</span>
+        <span class="n">reads</span> <span class="o">=</span> <span class="n">Read</span><span class="o">.</span><span class="n">multi_from_fastx</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">fasta</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">depth_filter</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">depth</span><span class="p">,</span> <span class="n">length_filter</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Running </span><span class="si">{}</span><span class="s2"> pre-medaka consensus for all reads.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">method</span><span class="p">))</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+    <span class="n">header</span><span class="p">,</span> <span class="n">consensuses</span><span class="p">,</span> <span class="n">alignments</span> <span class="o">=</span> <span class="n">poa_workflow</span><span class="p">(</span>
+        <span class="n">reads</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">threads</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">method</span><span class="p">)</span>
+    <span class="n">t1</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Writing medaka input bam for </span><span class="si">{}</span><span class="s2"> reads.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alignments</span><span class="p">)))</span>
+    <span class="n">bam_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="s1">&#39;subreads_to_spoa.bam&#39;</span><span class="p">)</span>
+    <span class="n">write_bam</span><span class="p">(</span><span class="n">bam_file</span><span class="p">,</span> <span class="n">alignments</span><span class="p">,</span> <span class="n">header</span><span class="p">)</span>
+
+    <span class="n">spoa_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="s1">&#39;poa.fasta&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">spoa_file</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fh</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">rname</span><span class="p">,</span> <span class="n">cons</span> <span class="ow">in</span> <span class="n">consensuses</span><span class="p">:</span>
+            <span class="n">fh</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;&gt;</span><span class="si">{}</span><span class="se">\n</span><span class="si">{}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">rname</span><span class="p">,</span> <span class="n">cons</span><span class="p">))</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running medaka consensus.&quot;</span><span class="p">)</span>
+    <span class="n">t2</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">bam</span> <span class="o">=</span> <span class="n">bam_file</span>
+    <span class="n">out_dir</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">output</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="s1">&#39;consensus.hdf&#39;</span><span class="p">)</span>
+    <span class="n">medaka</span><span class="o">.</span><span class="n">prediction</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">t3</span> <span class="o">=</span> <span class="n">now</span><span class="p">()</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running medaka stitch.&quot;</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">draft</span> <span class="o">=</span> <span class="n">spoa_file</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">]</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="s1">&#39;consensus.fasta&#39;</span><span class="p">)</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">regions</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># medaka consensus changes args.regions</span>
+    <span class="n">args</span><span class="o">.</span><span class="n">fillgaps</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">medaka</span><span class="o">.</span><span class="n">stitch</span><span class="o">.</span><span class="n">stitch</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Single-molecule consensus sequences written to </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">output</span><span class="p">))</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;POA time: </span><span class="si">{:.0f}</span><span class="s2">s, medaka time: </span><span class="si">{:.0f}</span><span class="s2">s&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">t1</span> <span class="o">-</span> <span class="n">t0</span><span class="p">,</span> <span class="n">t3</span> <span class="o">-</span> <span class="n">t2</span><span class="p">))</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2017-19, Oxford Nanopore Technologies.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
